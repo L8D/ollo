@@ -3,11 +3,11 @@
 # Usage: ollo create-subtasks-from-decomposition-plan [OPTIONS] [FILE]
 #
 # Options:
-#   --from-kota DOC_ID   Fetch plan from Kota document
+#   --from-ticket TICKET_ID   Fetch latest plan from Kota ticket
 #   --output-dir DIR     Write files to DIR instead of cache/{ISSUE_ID}/
 #   --dry-run            Parse and write cache files but skip ollo create-subtasks
 #
-# Input: file path, --from-kota, or stdin
+# Input: file path, --from-ticket, or stdin
 set -euo pipefail
 
 if [[ -z "${OLLO_HOME:-}" ]]; then
@@ -16,14 +16,14 @@ if [[ -z "${OLLO_HOME:-}" ]]; then
 fi
 
 DRY_RUN=false
-FROM_KOTA=""
+FROM_TICKET=""
 OUTPUT_DIR=""
 FILE_PATH=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --from-kota)
-      FROM_KOTA="$2"
+    --from-ticket)
+      FROM_TICKET="$2"
       shift 2
       ;;
     --output-dir)
@@ -49,9 +49,25 @@ TEMP_PLAN=""
 cleanup() { [[ -n "$TEMP_PLAN" ]] && rm -f "$TEMP_PLAN" || true; }
 trap cleanup EXIT
 
-if [[ -n "$FROM_KOTA" ]]; then
+if [[ -n "$FROM_TICKET" ]]; then
+  TICKET_JSON=$(kota tickets read "$FROM_TICKET" 2>/dev/null) || {
+    echo "error: failed to fetch ticket $FROM_TICKET" >&2
+    exit 1
+  }
+
+  DOC_ID=$(echo "$TICKET_JSON" | jq -r '
+    [.documents[] | select(.title | startswith("PLAN "))]
+    | sort_by(.updatedAt) | reverse
+    | .[0].id // empty
+  ')
+
+  if [[ -z "$DOC_ID" ]]; then
+    echo "error: no plan documents found in ticket $FROM_TICKET" >&2
+    exit 1
+  fi
+
   TEMP_PLAN=$(mktemp)
-  kota documents read "$FROM_KOTA" | jq -r '.content' >"$TEMP_PLAN"
+  kota documents read "$DOC_ID" | jq -r '.content' >"$TEMP_PLAN"
   PLAN_FILE="$TEMP_PLAN"
 elif [[ -n "$FILE_PATH" ]]; then
   if [[ ! -f "$FILE_PATH" ]]; then
