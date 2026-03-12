@@ -1,0 +1,18 @@
+{
+  "env": {
+    "RALPH_SESSION": "true"
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "__OLLO_PERMISSION_PROMPT__",
+            "timeout": 120
+          }
+        ]
+      }
+    ]
+  }
+}

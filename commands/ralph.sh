@@ -10,6 +10,11 @@ fi
 PROJECT_DIR="$(pwd)"
 SESSION_ID_FILE="$PROJECT_DIR/.claude/ralph-session-id"
 
+# Generate temp settings file with resolved hook path
+RALPH_SETTINGS=$(mktemp)
+sed "s|__OLLO_PERMISSION_PROMPT__|$OLLO_HOME/lib/permission-prompt.sh|g" \
+  "$OLLO_HOME/lib/settings.json" >"$RALPH_SETTINGS"
+
 DIM='\033[2m'
 RESET='\033[0m'
 GREEN='\033[32m'
@@ -20,6 +25,10 @@ CYAN='\033[36m'
 # Exit notification state
 EXIT_STATUS="failure"
 EXIT_MESSAGE=""
+
+cleanup_temp_settings() {
+  rm -f "$RALPH_SETTINGS"
+}
 
 send_slack_notification() {
   if [[ -f "$HOME/.claude/hooks/notify-user-attention.sh" ]]; then
@@ -69,7 +78,11 @@ handle_interrupt() {
   exit 130
 }
 
-trap send_slack_notification EXIT
+cleanup_all() {
+  cleanup_temp_settings
+  send_slack_notification
+}
+trap cleanup_all EXIT
 trap handle_interrupt INT TERM
 trap handle_soft_interrupt QUIT
 
@@ -295,7 +308,7 @@ main() {
   while true; do
     # Get next task before starting Claude
     local task_json
-    task_json=$(kota-get-next-task.sh $issue_id 2>/dev/null) || {
+    task_json=$(ollo next-subtask $issue_id 2>/dev/null) || {
       log "$RED" "Failed to get next task"
       EXIT_MESSAGE="Failed to get next task"
       exit 1
@@ -331,9 +344,9 @@ main() {
         exit 1
       fi
       log "$CYAN" "Using --resume $resume_session_id for first iteration"
-      (claude --settings "$PROJECT_DIR/.claude/settings.ralph.json" --permission-mode acceptEdits --output-format stream-json --verbose --resume "$resume_session_id" -p "${RALPH_CONTINUE_MSG:-continue}" 2>&1 | parse_streaming_json) &
+      (claude --settings "$RALPH_SETTINGS" --permission-mode acceptEdits --output-format stream-json --verbose --resume "$resume_session_id" -p "${RALPH_CONTINUE_MSG:-continue}" 2>&1 | parse_streaming_json) &
     else
-      (claude --settings "$PROJECT_DIR/.claude/settings.ralph.json" --permission-mode acceptEdits --output-format stream-json --verbose -p '/next-pr-task' 2>&1 | parse_streaming_json) &
+      (claude --settings "$RALPH_SETTINGS" --permission-mode acceptEdits --output-format stream-json --verbose -p '/next-pr-task' 2>&1 | parse_streaming_json) &
     fi
     PIPELINE_PID=$!
     wait $PIPELINE_PID 2>/dev/null
@@ -371,7 +384,7 @@ main() {
 
         # Run Claude with --resume and user's message
         set +e
-        (claude --settings "$PROJECT_DIR/.claude/settings.ralph.json" \
+        (claude --settings "$RALPH_SETTINGS" \
           --permission-mode acceptEdits \
           --output-format stream-json \
           --verbose \
@@ -416,7 +429,7 @@ main() {
 
     # After Claude exits, check if we're still on the same task
     local post_task_json
-    post_task_json=$(kota-get-next-task.sh $issue_id 2>/dev/null) || {
+    post_task_json=$(ollo next-subtask $issue_id 2>/dev/null) || {
       log "$RED" "Failed to check task status"
       EXIT_MESSAGE="Failed to check task status"
       exit 1
