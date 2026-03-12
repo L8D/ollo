@@ -2,7 +2,7 @@
 # Complete a subtask: commit staged changes + mark checkbox as done
 # Combines: git commit + mark-subtask-complete
 #
-# Usage: kota-complete-task.sh <TICKET_ID> <SUBTASK_ID> <COMMIT_MESSAGE>
+# Usage: ollo complete-subtask <TICKET_ID> <SUBTASK_ID> <COMMIT_MESSAGE>
 #
 # The script will:
 #   1. Commit staged changes with the provided message (+ Co-Authored-By trailer)
@@ -21,7 +21,7 @@ SUBTASK_ID="${2:-}"
 COMMIT_MESSAGE="${3:-}"
 
 if [ -z "$TICKET_ID" ] || [ -z "$SUBTASK_ID" ] || [ -z "$COMMIT_MESSAGE" ]; then
-  echo "Usage: kota-complete-task.sh <TICKET_ID> <SUBTASK_ID> <COMMIT_MESSAGE>" >&2
+  echo "Usage: ollo complete-subtask <TICKET_ID> <SUBTASK_ID> <COMMIT_MESSAGE>" >&2
   exit 1
 fi
 

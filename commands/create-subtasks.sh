@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Create Kota documents for subtasks and update the ticket checklist
-# Usage: kota-create-subtasks.sh <payload.json>
+# Usage: ollo create-subtasks <payload.json>
 #
 # Payload schema:
 # {
@@ -25,7 +25,7 @@ fi
 PAYLOAD_PATH="${1:-}"
 
 if [ -z "$PAYLOAD_PATH" ]; then
-  echo "Usage: kota-create-subtasks.sh <payload.json>" >&2
+  echo "Usage: ollo create-subtasks <payload.json>" >&2
   exit 1
 fi
 

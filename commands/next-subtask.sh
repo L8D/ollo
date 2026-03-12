@@ -2,7 +2,7 @@
 # Get all information needed to work on the next subtask from a Kota ticket
 # Combines: get-ticket-from-branch + get-next-subtask + get-subtask-document
 #
-# Usage: kota-get-next-task.sh [TICKET_ID]
+# Usage: ollo next-subtask [TICKET_ID]
 #   If TICKET_ID not provided, extracts from current branch name
 #
 # Output: Single JSON object with all task context
