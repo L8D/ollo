@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+# Resolve OLLO_HOME via symlink resolution
+SOURCE="${BASH_SOURCE[0]}"
+while [[ -L "$SOURCE" ]]; do
+  DIR="$(cd "$(dirname "$SOURCE")" && pwd)"
+  SOURCE="$(readlink "$SOURCE")"
+  [[ "$SOURCE" != /* ]] && SOURCE="$DIR/$SOURCE"
+done
+RESOLVED_DIR="$(cd "$(dirname "$SOURCE")" && pwd)"
+
+export OLLO_HOME="${OLLO_HOME:-"$(cd "$RESOLVED_DIR/.." && pwd)"}"
+
+usage() {
+  echo "Usage: ollo <command> [args...]"
+  echo ""
+  echo "Commands:"
+  local found=0
+  for f in "$OLLO_HOME"/commands/*.sh; do
+    [[ -f "$f" ]] || continue
+    found=1
+    echo "  $(basename "$f" .sh)"
+  done
+  if [[ $found -eq 0 ]]; then
+    echo "  (none)"
+  fi
+}
+
+if [[ $# -eq 0 || "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
+  usage
+  exit 0
+fi
+
+cmd="$1"
+shift
+
+if [[ ! -f "$OLLO_HOME/commands/$cmd.sh" ]]; then
+  echo "Error: unknown command '$cmd'" >&2
+  echo "" >&2
+  usage >&2
+  exit 1
+fi
+
+exec "$OLLO_HOME/commands/$cmd.sh" "$@"
