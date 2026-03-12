@@ -37,7 +37,7 @@ SHORT_SHA=""
 FULL_COMMIT_MSG=""
 
 # Check if there are staged changes
-if git diff --cached --quiet 2>/dev/null; then
+if [ -z "$(git diff --cached --name-only 2>/dev/null)" ]; then
   COMMIT_RESULT="no_staged_changes"
   COMMIT_ERROR="No staged changes to commit"
 else
