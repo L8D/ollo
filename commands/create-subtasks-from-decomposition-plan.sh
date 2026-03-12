@@ -46,7 +46,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 TEMP_PLAN=""
-cleanup() { [[ -n "$TEMP_PLAN" ]] && rm -f "$TEMP_PLAN"; }
+cleanup() { [[ -n "$TEMP_PLAN" ]] && rm -f "$TEMP_PLAN" || true; }
 trap cleanup EXIT
 
 if [[ -n "$FROM_KOTA" ]]; then
