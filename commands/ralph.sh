@@ -327,6 +327,24 @@ main() {
 
     log "$CYAN" "=== Starting $subtask_id ($issue_id_from_task) ==="
 
+    # Build composite prompt from template + task metadata + document content
+    local task_meta doc_content prompt_template prompt
+    task_meta=$(echo "$task_json" | jq 'del(.document.content)')
+    doc_content=$(echo "$task_json" | jq -r '.document.content // empty')
+    prompt_template=$(<"$OLLO_HOME/lib/work-subtask-prompt.md")
+
+    prompt="${prompt_template}
+
+<task-context>
+${task_meta}
+</task-context>
+
+<subtask-document>
+${doc_content}
+</subtask-document>"
+
+    [[ -n "${DEBUG:-}" ]] && echo "PROMPT:" >&2 && echo "$prompt" >&2
+
     # Run Claude with streaming JSON in background so SIGINT can interrupt `wait`
     set +e
     if [[ "$first_iteration" == "true" && "$continue_mode" == "true" ]]; then
@@ -346,7 +364,7 @@ main() {
       log "$CYAN" "Using --resume $resume_session_id for first iteration"
       (claude --settings "$RALPH_SETTINGS" --permission-mode acceptEdits --output-format stream-json --verbose --resume "$resume_session_id" -p "${RALPH_CONTINUE_MSG:-continue}" 2>&1 | parse_streaming_json) &
     else
-      (claude --settings "$RALPH_SETTINGS" --permission-mode acceptEdits --output-format stream-json --verbose -p '/next-pr-task' 2>&1 | parse_streaming_json) &
+      (claude --settings "$RALPH_SETTINGS" --permission-mode acceptEdits --output-format stream-json --verbose -p "$prompt" 2>&1 | parse_streaming_json) &
     fi
     PIPELINE_PID=$!
     wait $PIPELINE_PID 2>/dev/null
