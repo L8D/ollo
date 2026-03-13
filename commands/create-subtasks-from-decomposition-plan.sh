@@ -138,6 +138,37 @@ if [[ "$SUBTASK_COUNT" -eq 0 ]]; then
   exit 1
 fi
 
+# --- Idempotency check (only when --from-ticket is used) ---
+if [[ -n "$FROM_TICKET" ]]; then
+  # Subtask identifiers from the plan
+  PLAN_SUBTASKS=$(cut -f1 "$MANIFEST" | sort)
+
+  # Subtask identifiers from existing ticket documents
+  EXISTING_SUBTASKS=$(echo "$TICKET_JSON" | jq -r '
+    [.documents[].title | capture("^(?<id>SUBTASK-[0-9]+):") | .id] | .[]
+  ' | sort)
+
+  # Find what's only in plan vs only in existing vs in both
+  ONLY_IN_PLAN=$(comm -23 <(echo "$PLAN_SUBTASKS") <(echo "$EXISTING_SUBTASKS"))
+  IN_BOTH=$(comm -12 <(echo "$PLAN_SUBTASKS") <(echo "$EXISTING_SUBTASKS"))
+
+  if [[ -n "$IN_BOTH" ]]; then
+    if [[ -z "$ONLY_IN_PLAN" ]]; then
+      # All plan subtasks already exist — idempotent success
+      echo "Subtasks already created for $ISSUE_ID — nothing to do" >&2
+      rm -f "$MANIFEST"
+      exit 0
+    else
+      # Partial overlap — error
+      echo "error: partial overlap detected between plan and existing subtasks" >&2
+      echo "Already exist: $(echo "$IN_BOTH" | tr '\n' ' ')" >&2
+      echo "Missing: $(echo "$ONLY_IN_PLAN" | tr '\n' ' ')" >&2
+      exit 1
+    fi
+  fi
+  # No overlap — safe to continue
+fi
+
 PAYLOAD="$OUTPUT_DIR/payload.json"
 
 SUBTASKS_JSON="[]"
