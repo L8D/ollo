@@ -76,6 +76,35 @@ func effectiveArgv(args []string) (string, string) {
 	if i+1 < len(args) {
 		argv1 = args[i+1]
 	}
+
+	// Git: skip global flags to find the real subcommand
+	// e.g. git -C /path status  →  argv1 = "status"
+	// e.g. git --no-pager log   →  argv1 = "log"
+	if argv0 == "git" {
+		gitValueFlags := map[string]bool{
+			"-C": true, "-c": true, "--git-dir": true,
+			"--work-tree": true, "--namespace": true,
+		}
+		j := i + 1
+		for j < len(args) {
+			w := args[j]
+			if gitValueFlags[w] {
+				j += 2 // skip flag + its value argument
+				continue
+			}
+			if strings.HasPrefix(w, "-") {
+				j++ // bare flag, skip one token
+				continue
+			}
+			break
+		}
+		if j < len(args) {
+			argv1 = args[j]
+		} else {
+			argv1 = ""
+		}
+	}
+
 	return argv0, argv1
 }
 
@@ -178,7 +207,30 @@ func collectKeys(node syntax.Node, keys *[]string) {
 			}
 		}
 
-		key := formatKey(argv0, argv1)
+		// find -exec/-execdir: surface the executed command instead of find itself
+		var key string
+		if argv0 == "find" {
+			for idx := 0; idx < len(args); idx++ {
+				if args[idx] == "-exec" || args[idx] == "-execdir" {
+					var execArgs []string
+					for k := idx + 1; k < len(args); k++ {
+						w := args[k]
+						if w == "{}" || w == ";" || w == `\;` || w == "+" {
+							break
+						}
+						execArgs = append(execArgs, w)
+					}
+					if len(execArgs) > 0 {
+						ea0, ea1 := effectiveArgv(execArgs)
+						key = formatKey(ea0, ea1)
+					}
+					break // only handle first -exec
+				}
+			}
+		}
+		if key == "" {
+			key = formatKey(argv0, argv1)
+		}
 		if key != "" {
 			*keys = append(*keys, key)
 		}
@@ -300,6 +352,37 @@ var tests = []testCase{
 		// process substitution
 		"diff <(sort a.txt) <(sort b.txt)",
 		[]string{"Bash(diff <(:*)", "Bash(sort a.txt:*)", "Bash(sort b.txt:*)"},
+	},
+	// git -C <path> flag unwrapping
+	{
+		"git -C /path status",
+		[]string{"Bash(git status:*)"},
+	},
+	{
+		"git -c user.name=foo commit -m 'msg'",
+		[]string{"Bash(git commit:*)"},
+	},
+	{
+		"git --no-pager log",
+		[]string{"Bash(git log:*)"},
+	},
+	{
+		"git --git-dir /foo --work-tree /bar status",
+		[]string{"Bash(git status:*)"},
+	},
+	// find -exec subcommand surfacing
+	{
+		`find . -name "*.ts" -exec rm -rf {} \;`,
+		[]string{"Bash(rm -rf:*)"},
+	},
+	{
+		`find /tmp -type f -execdir chmod 644 {} +`,
+		[]string{"Bash(chmod 644:*)"},
+	},
+	{
+		// no -exec: keep find key
+		`find . -name "*.log"`,
+		[]string{"Bash(find .:*)"},
 	},
 }
 
