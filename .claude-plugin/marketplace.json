@@ -1,0 +1,13 @@
+{
+  "name": "ollo",
+  "owner": { "name": "Finley" },
+  "plugins": [
+    {
+      "name": "ollo",
+      "source": "./",
+      "description": "Task orchestration tool with plan backup and permission prompt hooks",
+      "version": "1.0.0",
+      "author": { "name": "Finley" }
+    }
+  ]
+}
