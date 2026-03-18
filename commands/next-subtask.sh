@@ -23,7 +23,10 @@ if [ -z "$TICKET_ID" ]; then
     exit 1
   fi
 
-  TICKET_ID=$(echo "$BRANCH" | grep -oiE 'snwlly-[0-9]+' | tr '[:lower:]' '[:upper:]' | head -1)
+  # Use KOTA_DEFAULT_PREFIX if set, otherwise fall back to snwlly
+  prefix="${KOTA_DEFAULT_PREFIX:-snwlly}"
+  prefix_lower=$(echo "$prefix" | tr '[:upper:]' '[:lower:]')
+  TICKET_ID=$(echo "$BRANCH" | grep -oiE "${prefix_lower}-[0-9]+" | tr '[:lower:]' '[:upper:]' | head -1)
   if [ -z "$TICKET_ID" ]; then
     jq -n --arg branch "$BRANCH" '{"error": "No Kota ticket ID found in branch name", "branch": $branch, "step": "get_ticket_id"}'
     exit 1
@@ -83,8 +86,13 @@ fi
 # Step 5: Collect prior lessons from git notes on branch commits
 PRIOR_LESSONS_JSON="[]"
 
-# Use merge-base with main to find branch point
-FALLBACK_BASE=$(git merge-base HEAD main 2>/dev/null || git merge-base HEAD master 2>/dev/null || true)
+# Use merge-base with the trunk branch (from git-spice top) to find branch point
+TRUNK_BRANCH=$(git-spice top --dry-run 2>/dev/null || true)
+if [ -z "$TRUNK_BRANCH" ]; then
+  # Fallback to main or master if git-spice top fails
+  TRUNK_BRANCH="main"
+fi
+FALLBACK_BASE=$(git merge-base HEAD "$TRUNK_BRANCH" 2>/dev/null || git merge-base HEAD master 2>/dev/null || true)
 if [ -n "$FALLBACK_BASE" ]; then
   BRANCH_SHAS=$(git log "${FALLBACK_BASE}..HEAD" --format="%H" 2>/dev/null || true)
 else
