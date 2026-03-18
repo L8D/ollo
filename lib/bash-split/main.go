@@ -208,10 +208,20 @@ func collectKeys(node syntax.Node, keys *[]string) {
 		}
 
 		// find -exec/-execdir: surface the executed command instead of find itself
+		// find with -delete/-ok/-okdir: keep as find (unsafe)
+		// find with no side-effect flags: surface as find__safe (safe, read-only)
 		var key string
 		if argv0 == "find" {
+			unsafeFindFlags := map[string]bool{
+				"-exec": true, "-execdir": true,
+				"-delete": true, "-ok": true, "-okdir": true,
+			}
+			foundExec := false
+			foundUnsafe := false
 			for idx := 0; idx < len(args); idx++ {
-				if args[idx] == "-exec" || args[idx] == "-execdir" {
+				flag := args[idx]
+				if flag == "-exec" || flag == "-execdir" {
+					foundExec = true
 					var execArgs []string
 					for k := idx + 1; k < len(args); k++ {
 						w := args[k]
@@ -226,6 +236,13 @@ func collectKeys(node syntax.Node, keys *[]string) {
 					}
 					break // only handle first -exec
 				}
+				if unsafeFindFlags[flag] {
+					foundUnsafe = true
+				}
+			}
+			if !foundExec && !foundUnsafe {
+				// Safe, read-only find — emit find__safe
+				key = formatKey("find__safe", argv1)
 			}
 		}
 		if key == "" {
@@ -380,8 +397,18 @@ var tests = []testCase{
 		[]string{"Bash(chmod 644:*)"},
 	},
 	{
-		// no -exec: keep find key
+		// no -exec and no unsafe flags: surface as find__safe
 		`find . -name "*.log"`,
+		[]string{"Bash(find__safe .:*)"},
+	},
+	{
+		// -delete is unsafe: keep as find
+		`find . -name "*.tmp" -delete`,
+		[]string{"Bash(find .:*)"},
+	},
+	{
+		// -ok is unsafe: keep as find
+		`find . -type f -ok rm {} \;`,
 		[]string{"Bash(find .:*)"},
 	},
 }
