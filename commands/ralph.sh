@@ -211,6 +211,7 @@ format_tool_call() {
 }
 
 parse_streaming_json() {
+  local _img_ids=""
   while IFS= read -r line; do
     [[ -z "$line" ]] && continue
 
@@ -236,7 +237,12 @@ parse_streaming_json() {
           if [[ "$block_type" == "tool_result" ]]; then
             local is_error=$(echo "$block" | jq -r '.is_error // false')
             local result=$(echo "$block" | jq -r '.content // "" | if type == "string" then . else tostring end')
-
+            local _tid
+            _tid=$(echo "$block" | jq -r '.tool_use_id // empty')
+            if [[ -n "$_tid" && "$_img_ids" == *"|${_tid}"* ]]; then
+              log "$DIM" "← (image data omitted)"
+              continue
+            fi
             if [[ "$is_error" == "true" ]]; then
               log "$RED" "← ERROR: $result"
             else
@@ -251,6 +257,17 @@ parse_streaming_json() {
           "tool_use")
             local tool_name=$(echo "$line" | jq -r '.message.content[0].name // empty')
             local tool_input=$(echo "$line" | jq -c '.message.content[0].input // {}')
+            if [[ "$tool_name" == "Read" ]]; then
+              local _fp
+              _fp=$(echo "$tool_input" | jq -r '.file_path // empty')
+              case "${_fp##*.}" in
+                png | PNG | jpg | JPG | jpeg | JPEG | gif | GIF | webp | WEBP)
+                  local _id
+                  _id=$(echo "$line" | jq -r '.message.content[0].id // empty')
+                  [[ -n "$_id" ]] && _img_ids="${_img_ids}|${_id}"
+                  ;;
+              esac
+            fi
             local formatted
             formatted=$(format_tool_call "$tool_name" "$tool_input")
             log_multiline "$CYAN" "$formatted"
