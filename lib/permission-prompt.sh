@@ -7,8 +7,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 OLLO_HOME="${OLLO_HOME:-"$(cd "$SCRIPT_DIR/.." && pwd)"}"
 
-# Settings file is in the project being worked on (passed via CLAUDE_PROJECT_DIR by Claude)
-SETTINGS_FILE="${CLAUDE_PROJECT_DIR:-.}/.claude/settings.local.json"
+# SETTINGS_FILE is set below after reading stdin (needs cwd from hook input JSON)
 
 # Path to the bash-split binary (real bash AST parser).
 # Override via BASH_SPLIT env var; default is relative to OLLO_HOME.
@@ -16,6 +15,11 @@ BASH_SPLIT="${BASH_SPLIT:-"$OLLO_HOME/lib/bash-split/dist/bash-split"}"
 
 # Read JSON input from stdin
 input=$(cat)
+
+# Resolve project settings file: prefer CLAUDE_PROJECT_DIR env var, fall back to cwd from hook input JSON
+hook_cwd=$(echo "$input" | jq -r '.cwd // ""')
+SETTINGS_FILE="${CLAUDE_PROJECT_DIR:-${hook_cwd:-.}}/.claude/settings.local.json"
+[[ -n "${RALPH_DEBUG:-}" ]] && echo "DEBUG: SETTINGS_FILE=$SETTINGS_FILE exists=$(test -f "$SETTINGS_FILE" && echo yes || echo no)" >&2
 
 # Extract tool information
 tool_name=$(echo "$input" | jq -r '.tool_name')
