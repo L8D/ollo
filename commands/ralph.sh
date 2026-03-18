@@ -31,9 +31,7 @@ cleanup_temp_settings() {
 }
 
 send_slack_notification() {
-  if [[ -f "$HOME/.claude/hooks/notify-user-attention.sh" ]]; then
-    RALPH_FORCE_NOTIFY=true "$HOME/.claude/hooks/notify-user-attention.sh"
-  fi
+  crier
 
   [[ -z "${SLACK_BEARER_TOKEN:-}" ]] && return
 

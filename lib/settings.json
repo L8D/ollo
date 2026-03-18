@@ -1,6 +1,6 @@
 {
   "env": {
-    "RALPH_SESSION": "true"
+    "CRIER_ENABLED": "false"
   },
   "hooks": {
     "PreToolUse": [
