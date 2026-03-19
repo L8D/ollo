@@ -360,6 +360,43 @@ log_missed_permission "$tool_name" "$permission_key" "$tool_input"
 # Prompt user via osascript
 tool_description=$(format_tool_description "$tool_name" "$tool_input")
 
+# Collect all permission sub-keys for this command
+if [[ "$tool_name" == "Bash" ]]; then
+  bash_cmd=$(echo "$tool_input" | jq -r '.command // ""')
+  all_sub_keys=$(split_compound_command "$bash_cmd" | while IFS= read -r sub_cmd; do
+    [[ -z "$sub_cmd" ]] && continue
+    if [[ "$sub_cmd" == Bash\(* ]]; then
+      echo "$sub_cmd"
+    else
+      permission_key_for_single_command "$sub_cmd"
+    fi
+  done | sort -u)
+else
+  all_sub_keys="$permission_key"
+fi
+
+# Filter to only keys not already in the allow list
+allow_array=$(jq -r '.permissions.allow // [] | .[]' "$SETTINGS_FILE" 2>/dev/null) || allow_array=""
+new_keys=""
+while IFS= read -r k; do
+  [[ -z "$k" ]] && continue
+  if ! check_single_key_against_array "$k" "$allow_array"; then
+    new_keys="${new_keys:+$new_keys
+}$k"
+  fi
+done <<<"$all_sub_keys"
+
+# Append to description
+if [[ -n "$new_keys" ]]; then
+  key_count=$(echo "$new_keys" | grep -c .)
+  if [[ "$key_count" -eq 1 ]]; then
+    tool_description=$(printf '%s\n\nAlways allow/deny will apply to: %s' "$tool_description" "$new_keys")
+  else
+    formatted_keys=$(echo "$new_keys" | sed 's/^/• /')
+    tool_description=$(printf '%s\n\nAlways allow/deny will apply to:\n%s' "$tool_description" "$formatted_keys")
+  fi
+fi
+
 # Escape special characters for osascript (double quotes and backslashes)
 escaped_description=$(printf '%s' "$tool_description" | sed 's/\\/\\\\/g; s/"/\\"/g')
 
@@ -380,14 +417,22 @@ case "$response" in
     printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"allow"}}\n'
     ;;
   "Always allow")
-    add_permission "$permission_key" "permissions.allow"
+    persist_keys="${new_keys:-$permission_key}"
+    while IFS= read -r k; do
+      [[ -z "$k" ]] && continue
+      add_permission "$k" "permissions.allow"
+    done <<<"$persist_keys"
     printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"allow"}}\n'
     ;;
   "Deny once")
     printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Permission denied by user (once)"}}\n'
     ;;
   "Always deny")
-    add_permission "$permission_key" "permissions.deny"
+    persist_keys="${new_keys:-$permission_key}"
+    while IFS= read -r k; do
+      [[ -z "$k" ]] && continue
+      add_permission "$k" "permissions.deny"
+    done <<<"$persist_keys"
     printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Permission denied by user (always)"}}\n'
     ;;
   *)
