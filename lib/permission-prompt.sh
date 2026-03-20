@@ -19,6 +19,7 @@ input=$(cat)
 # Resolve project settings file: prefer CLAUDE_PROJECT_DIR env var, fall back to cwd from hook input JSON
 hook_cwd=$(echo "$input" | jq -r '.cwd // ""')
 SETTINGS_FILE="${CLAUDE_PROJECT_DIR:-${hook_cwd:-.}}/.claude/settings.local.json"
+[[ -L "$SETTINGS_FILE" ]] && SETTINGS_FILE="$(readlink -f "$SETTINGS_FILE")"
 [[ -n "${RALPH_DEBUG:-}" ]] && echo "DEBUG: SETTINGS_FILE=$SETTINGS_FILE exists=$(test -f "$SETTINGS_FILE" && echo yes || echo no)" >&2
 
 # Extract tool information
