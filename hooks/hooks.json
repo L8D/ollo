@@ -10,6 +10,16 @@
           }
         ]
       }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "ollo sync-description-on-prompt"
+          }
+        ]
+      }
     ]
   }
 }
