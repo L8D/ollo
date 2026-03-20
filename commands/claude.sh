@@ -42,6 +42,7 @@ if [[ "$RESET" == "true" ]]; then
   CURRENT=$(cat "$STATE_FILE" 2>/dev/null || echo "0")
   NEXT=$((CURRENT + 1))
   printf '%s' "$NEXT" >"$STATE_FILE"
+  rm -f "$STATE_DIR/$TICKET_ID.synced"
   echo "Session reset for $TICKET_ID (generation $NEXT — next invocation will start a new session)" >&2
   exit 0
 fi
