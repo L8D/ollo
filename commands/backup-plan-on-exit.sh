@@ -65,32 +65,25 @@ kota documents create \
 # Extract clarifications and user follow-ups from transcript
 {
   # Step 1: Extract AskUserQuestion Q&A pairs
-  AQ_CONTENT=$(jq -r '
-    select(.type == "assistant") |
-    {
-      uuid: .uuid,
-      content: .message.content // []
-    } |
-    .content as $content |
-    (
-      ($content | to_entries | map(select(.value.type == "tool_use" and .value.name == "AskUserQuestion"))) as $tool_uses |
-      ($content | map(select(.type == "tool_result"))) as $results |
-      $tool_uses[] as $tool_use_entry |
-      ($results[] | select(.tool_use_id == $tool_use_entry.value.id)) as $result |
-      {
-        uuid: .uuid,
-        type: "question",
-        data: {
-          questions: $tool_use_entry.value.input.questions,
-          answer: $result.content
-        }
-      }
-    )
-  ' "$TRANSCRIPT" 2>/dev/null)
+  AQ_CONTENT=$(jq -c '
+    [.[] | select(.type == "assistant") | .uuid as $uuid |
+      .message.content[]? | select(.type == "tool_use" and .name == "AskUserQuestion") |
+      {uuid: $uuid, tool_id: .id, questions: .input.questions}
+    ] as $tool_uses |
+    [.[] | select(.type == "user") |
+      .message.content[]? | select(.type == "tool_result") |
+      {tool_use_id: .tool_use_id, answer: (.content | if type == "array" then (map(.text // "") | join("")) elif type == "string" then . else "" end)}
+    ] as $results |
+    $tool_uses[] |
+    . as $tu |
+    ($results[] | select(.tool_use_id == $tu.tool_id)) as $r |
+    {uuid: $tu.uuid, type: "question", data: {questions: $tu.questions, answer: $r.answer}}
+  ' <(jq -s '.' "$TRANSCRIPT") 2>/dev/null)
 
   # Step 2: Extract user follow-up messages (all except first)
-  USER_CONTENT=$(jq -r '
+  USER_CONTENT=$(jq -c '
     select(.type == "user") |
+    select(.message.content | type == "string") |
     {
       uuid: .uuid,
       type: "user_message",
