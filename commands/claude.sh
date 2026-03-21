@@ -36,8 +36,10 @@ fi
 # ─── Determine CLI executable ───────────────────────────────────────────────
 if [[ "${USE_CLAUDISH:-false}" == "true" || "${OLLO_CLAUDISH_ENABLED:-}" == "true" ]]; then
   CLAUDE_CMD=claudish
+  CLAUDE_EXTRA_ARGS=(--interactive)
 else
   CLAUDE_CMD=claude
+  CLAUDE_EXTRA_ARGS=()
 fi
 
 # ─── Environment ────────────────────────────────────────────────────────────
@@ -73,8 +75,8 @@ TRANSCRIPT_FILE="$HOME/.claude/projects/${PROJECT_KEY}/${SESSION_ID}.jsonl"
 
 if [[ -f "$TRANSCRIPT_FILE" ]]; then
   echo "Session $SESSION_ID exists — resuming. (${TICKET_ID} gen ${GENERATION})" >&2
-  exec "$CLAUDE_CMD" --interactive --resume "$SESSION_ID" --name "$SESSION_NAME" "${CLAUDE_ARGS[@]+"${CLAUDE_ARGS[@]}"}"
+  exec "$CLAUDE_CMD" "${CLAUDE_EXTRA_ARGS[@]+"${CLAUDE_EXTRA_ARGS[@]}"}" --resume "$SESSION_ID" --name "$SESSION_NAME" "${CLAUDE_ARGS[@]+"${CLAUDE_ARGS[@]}"}"
 else
   echo "Session $SESSION_ID not found — creating. (${TICKET_ID} gen ${GENERATION})" >&2
-  exec "$CLAUDE_CMD" --interactive --session-id "$SESSION_ID" --name "$SESSION_NAME" "${CLAUDE_ARGS[@]+"${CLAUDE_ARGS[@]}"}"
+  exec "$CLAUDE_CMD" "${CLAUDE_EXTRA_ARGS[@]+"${CLAUDE_EXTRA_ARGS[@]}"}" --session-id "$SESSION_ID" --name "$SESSION_NAME" "${CLAUDE_ARGS[@]+"${CLAUDE_ARGS[@]}"}"
 fi

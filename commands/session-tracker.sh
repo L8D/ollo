@@ -100,7 +100,7 @@ cmd_start_with_prompt() {
   fi
 
   # Create tmux session running claude with prompt (in main worktree)
-  tmux new-session -d -s "$ticket_id" -c "$(pwd)" -- direnv exec . ollo claude "$ticket_id" -- -p "$prompt"
+  tmux new-session -d -s "$ticket_id" -c "$(pwd)" -- direnv exec . ollo claude "$ticket_id" -- "$prompt"
 
   # Write initial session JSON
   write_session "$ticket_id" ".ticketId = \"$ticket_id\" | .tmuxSession = \"$ticket_id\" | .phase = \"created\" | .attention = false | .activeSubtask = null | .pid = null | .startedAt = \"$(now_iso)\" | .lastUpdated = \"$(now_iso)\""
