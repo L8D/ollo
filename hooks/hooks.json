@@ -44,11 +44,21 @@
         ]
       },
       {
-        "matcher": "AskUserQuestion|ExitPlanMode",
+        "matcher": "AskUserQuestion",
         "hooks": [
           {
             "type": "command",
             "command": "ollo session-tracker set-attention \"$KOTA_CURRENT_TICKET_ID\"",
+            "async": true
+          }
+        ]
+      },
+      {
+        "matcher": "ExitPlanMode",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "ollo session-tracker set-planned \"$KOTA_CURRENT_TICKET_ID\"",
             "async": true
           }
         ]

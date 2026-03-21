@@ -5,7 +5,7 @@ set -euo pipefail
 # Manages tmux sessions, phase transitions, and attention state for tickets.
 #
 # Usage: ollo session-tracker <command> [TICKET_ID]
-# Commands: start, start-with-prompt, stop, restart, plan, decompose, execute, review, status, list, set-attention, clear-attention, set-ready, set-planning, prefill-planning-prompt
+# Commands: start, start-with-prompt, stop, restart, plan, decompose, execute, review, status, list, set-attention, clear-attention, set-ready, set-planning, set-planned, prefill-planning-prompt
 
 SESSIONS_DIR=".ollo/sessions"
 
@@ -381,6 +381,24 @@ cmd_set_planning() {
   write_session "$ticket_id" ".phase = \"planning\" | .lastUpdated = \"$(now_iso)\""
 }
 
+# ─── Sub-command: set-planned ───────────────────────────────────────────────
+
+cmd_set_planned() {
+  local ticket_id="$1"
+
+  # Graceful no-op if ticket_id is empty
+  if [[ -z "$ticket_id" ]]; then
+    exit 0
+  fi
+
+  # Graceful no-op if session file doesn't exist
+  if [[ ! -f "$(session_file "$ticket_id")" ]]; then
+    exit 0
+  fi
+
+  write_session "$ticket_id" ".phase = \"planned\" | .attention = true | .lastUpdated = \"$(now_iso)\""
+}
+
 # ─── Sub-command: prefill-planning-prompt ────────────────────────────────────
 
 cmd_prefill_planning_prompt() {
@@ -428,9 +446,10 @@ case "$subcmd" in
   clear-attention) cmd_clear_attention "$@" ;;
   set-ready) cmd_set_ready "$@" ;;
   set-planning) cmd_set_planning "$@" ;;
+  set-planned) cmd_set_planned "$@" ;;
   prefill-planning-prompt) cmd_prefill_planning_prompt "$@" ;;
   *)
-    echo "Usage: ollo session-tracker <start|start-with-prompt|stop|restart|plan|decompose|execute|review|status|list|set-attention|clear-attention|set-ready|set-planning|prefill-planning-prompt> [TICKET_ID]" >&2
+    echo "Usage: ollo session-tracker <start|start-with-prompt|stop|restart|plan|decompose|execute|review|status|list|set-attention|clear-attention|set-ready|set-planning|set-planned|prefill-planning-prompt> [TICKET_ID]" >&2
     exit 1
     ;;
 esac
