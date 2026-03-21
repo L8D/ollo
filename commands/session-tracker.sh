@@ -5,7 +5,7 @@ set -euo pipefail
 # Manages tmux sessions, phase transitions, and attention state for tickets.
 #
 # Usage: ollo session-tracker <command> [TICKET_ID]
-# Commands: start, stop, restart, plan, decompose, execute, review, status, list, set-attention, clear-attention
+# Commands: start, stop, restart, plan, decompose, execute, review, status, list, set-attention, clear-attention, set-ready, set-planning
 
 SESSIONS_DIR=".ollo/sessions"
 
@@ -77,7 +77,7 @@ cmd_start() {
   tmux new-session -d -s "$ticket_id" -c "$(pwd)" -- direnv exec . ollo claude "$ticket_id"
 
   # Write initial session JSON
-  write_session "$ticket_id" ".ticketId = \"$ticket_id\" | .tmuxSession = \"$ticket_id\" | .phase = \"planning\" | .attention = false | .activeSubtask = null | .pid = null | .startedAt = \"$(now_iso)\" | .lastUpdated = \"$(now_iso)\""
+  write_session "$ticket_id" ".ticketId = \"$ticket_id\" | .tmuxSession = \"$ticket_id\" | .phase = \"created\" | .attention = false | .activeSubtask = null | .pid = null | .startedAt = \"$(now_iso)\" | .lastUpdated = \"$(now_iso)\""
 
   echo "Session started: $ticket_id" >&2
 }
@@ -319,6 +319,42 @@ cmd_clear_attention() {
   write_session "$ticket_id" ".attention = false | .lastUpdated = \"$(now_iso)\""
 }
 
+# ─── Sub-command: set-ready ──────────────────────────────────────────────────
+
+cmd_set_ready() {
+  local ticket_id="$1"
+
+  # Graceful no-op if ticket_id is empty
+  if [[ -z "$ticket_id" ]]; then
+    exit 0
+  fi
+
+  # Graceful no-op if session file doesn't exist
+  if [[ ! -f "$(session_file "$ticket_id")" ]]; then
+    exit 0
+  fi
+
+  write_session "$ticket_id" ".phase = \"ready\" | .lastUpdated = \"$(now_iso)\""
+}
+
+# ─── Sub-command: set-planning ───────────────────────────────────────────────
+
+cmd_set_planning() {
+  local ticket_id="$1"
+
+  # Graceful no-op if ticket_id is empty
+  if [[ -z "$ticket_id" ]]; then
+    exit 0
+  fi
+
+  # Graceful no-op if session file doesn't exist
+  if [[ ! -f "$(session_file "$ticket_id")" ]]; then
+    exit 0
+  fi
+
+  write_session "$ticket_id" ".phase = \"planning\" | .lastUpdated = \"$(now_iso)\""
+}
+
 # ─── Dispatcher ──────────────────────────────────────────────────────────────
 
 subcmd="${1:-}"
@@ -336,8 +372,10 @@ case "$subcmd" in
   list) cmd_list ;;
   set-attention) cmd_set_attention "$@" ;;
   clear-attention) cmd_clear_attention "$@" ;;
+  set-ready) cmd_set_ready "$@" ;;
+  set-planning) cmd_set_planning "$@" ;;
   *)
-    echo "Usage: ollo session-tracker <start|stop|restart|plan|decompose|execute|review|status|list|set-attention|clear-attention> [TICKET_ID]" >&2
+    echo "Usage: ollo session-tracker <start|stop|restart|plan|decompose|execute|review|status|list|set-attention|clear-attention|set-ready|set-planning> [TICKET_ID]" >&2
     exit 1
     ;;
 esac
