@@ -372,11 +372,14 @@ cmd_prefill_planning_prompt() {
   # Build the prefill text: "TICKET_ID title" followed by two newlines
   # The two newlines create a visual separator for the user to type below
   local prefill_text
-  prefill_text=$(printf '%s %s\n\n' "$ticket_id" "$title")
+  prefill_text=$(printf '%s %s\\' "$ticket_id" "$title")
 
   # Use tmux send-keys with -l (literal) flag to insert text without
-  # interpreting escape sequences. This does NOT press Enter/submit.
+  # interpreting escape sequences.
   tmux send-keys -t "$ticket_id" -l "$prefill_text"
+  tmux send-keys -t "$ticket_id" Enter
+  tmux send-keys -t "$ticket_id" -l '\'
+  tmux send-keys -t "$ticket_id" Enter
 }
 
 # ─── Dispatcher ──────────────────────────────────────────────────────────────
