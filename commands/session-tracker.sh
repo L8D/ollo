@@ -173,7 +173,7 @@ cmd_decompose() {
   fi
 
   # Kill current process and start decompose
-  tmux respawn-pane -k -t "$ticket_id" "direnv exec . ollo claude $ticket_id -- -p '/ollo:decompose'"
+  tmux respawn-pane -k -t "$ticket_id" "direnv exec . ollo claude $ticket_id -- '/ollo:decompose'"
 
   # Update session JSON
   write_session "$ticket_id" ".phase = \"decomposing\" | .attention = false | .lastUpdated = \"$(now_iso)\""
