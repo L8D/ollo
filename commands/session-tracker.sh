@@ -5,7 +5,7 @@ set -euo pipefail
 # Manages tmux sessions, phase transitions, and attention state for tickets.
 #
 # Usage: ollo session-tracker <command> [TICKET_ID]
-# Commands: start, stop, restart, plan, decompose, execute, review, status, list, set-attention, clear-attention, set-ready, set-planning, prefill-planning-prompt
+# Commands: start, start-with-prompt, stop, restart, plan, decompose, execute, review, status, list, set-attention, clear-attention, set-ready, set-planning, prefill-planning-prompt
 
 SESSIONS_DIR=".ollo/sessions"
 
@@ -75,6 +75,32 @@ cmd_start() {
 
   # Create tmux session running claude (in main worktree)
   tmux new-session -d -s "$ticket_id" -c "$(pwd)" -- direnv exec . ollo claude "$ticket_id"
+
+  # Write initial session JSON
+  write_session "$ticket_id" ".ticketId = \"$ticket_id\" | .tmuxSession = \"$ticket_id\" | .phase = \"created\" | .attention = false | .activeSubtask = null | .pid = null | .startedAt = \"$(now_iso)\" | .lastUpdated = \"$(now_iso)\""
+
+  echo "Session started: $ticket_id" >&2
+}
+
+# ─── Sub-command: start-with-prompt ──────────────────────────────────────────
+
+cmd_start_with_prompt() {
+  local ticket_id="$1"
+  local prompt="$2"
+
+  if [[ -z "$ticket_id" ]] || [[ -z "$prompt" ]]; then
+    echo "Usage: ollo session-tracker start-with-prompt <TICKET_ID> <PROMPT>" >&2
+    exit 1
+  fi
+
+  # Check if tmux session already exists
+  if tmux has-session -t "$ticket_id" 2>/dev/null; then
+    echo "Tmux session already exists: $ticket_id" >&2
+    exit 0
+  fi
+
+  # Create tmux session running claude with prompt (in main worktree)
+  tmux new-session -d -s "$ticket_id" -c "$(pwd)" -- direnv exec . ollo claude "$ticket_id" -- -p "$prompt"
 
   # Write initial session JSON
   write_session "$ticket_id" ".ticketId = \"$ticket_id\" | .tmuxSession = \"$ticket_id\" | .phase = \"created\" | .attention = false | .activeSubtask = null | .pid = null | .startedAt = \"$(now_iso)\" | .lastUpdated = \"$(now_iso)\""
@@ -389,6 +415,7 @@ shift || true
 
 case "$subcmd" in
   start) cmd_start "$@" ;;
+  start-with-prompt) cmd_start_with_prompt "$@" ;;
   stop) cmd_stop "$@" ;;
   restart) cmd_restart "$@" ;;
   plan) cmd_plan "$@" ;;
@@ -403,7 +430,7 @@ case "$subcmd" in
   set-planning) cmd_set_planning "$@" ;;
   prefill-planning-prompt) cmd_prefill_planning_prompt "$@" ;;
   *)
-    echo "Usage: ollo session-tracker <start|stop|restart|plan|decompose|execute|review|status|list|set-attention|clear-attention|set-ready|set-planning|prefill-planning-prompt> [TICKET_ID]" >&2
+    echo "Usage: ollo session-tracker <start|start-with-prompt|stop|restart|plan|decompose|execute|review|status|list|set-attention|clear-attention|set-ready|set-planning|prefill-planning-prompt> [TICKET_ID]" >&2
     exit 1
     ;;
 esac
