@@ -12,6 +12,9 @@ if [ -f "$MARKER" ]; then
   exit 0
 fi
 
+# Transition to planning phase on first prompt
+ollo session-tracker set-planning "$KOTA_CURRENT_TICKET_ID" 2>/dev/null || true
+
 # Read prompt from stdin
 INPUT=$(cat)
 PROMPT=$(echo "$INPUT" | jq -r '.prompt')
