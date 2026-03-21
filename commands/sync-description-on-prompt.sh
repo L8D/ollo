@@ -12,6 +12,11 @@ if [ -f "$MARKER" ]; then
   exit 0
 fi
 
+# Skip if description sync has been disabled (e.g. started with description as prompt)
+if [ "${OLLO_SYNC_DESCRIPTION_ON_PROMPT_ENABLED:-true}" = "false" ]; then
+  exit 0
+fi
+
 # Transition to planning phase on first prompt
 ollo session-tracker set-planning "$KOTA_CURRENT_TICKET_ID" 2>/dev/null || true
 
