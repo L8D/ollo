@@ -49,6 +49,10 @@ fi
 
 GENERATION=$(cat "$STATE_FILE" 2>/dev/null || echo "0")
 
+# ─── Session name with ticket title ──────────────────────────────────────────
+TICKET_TITLE=$(kota tickets read "$TICKET_ID" 2>/dev/null | jq -r '.title // ""')
+SESSION_NAME="$TICKET_ID $TICKET_TITLE"
+
 # ─── Deterministic session ID ────────────────────────────────────────────────
 PROJECT_KEY="$(pwd | tr '/' '-' | tr '.' '-')"
 HEX=$(printf '%s:%s:%s' "$TICKET_ID" "$PROJECT_KEY" "$GENERATION" | shasum -a 256 | cut -c1-32)
@@ -59,8 +63,8 @@ TRANSCRIPT_FILE="$HOME/.claude/projects/${PROJECT_KEY}/${SESSION_ID}.jsonl"
 
 if [[ -f "$TRANSCRIPT_FILE" ]]; then
   echo "Session $SESSION_ID exists — resuming. (${TICKET_ID} gen ${GENERATION})" >&2
-  exec claudish --interactive --resume "$SESSION_ID" "${CLAUDE_ARGS[@]+"${CLAUDE_ARGS[@]}"}"
+  exec claudish --interactive --resume "$SESSION_ID" --name "$SESSION_NAME" "${CLAUDE_ARGS[@]+"${CLAUDE_ARGS[@]}"}"
 else
   echo "Session $SESSION_ID not found — creating. (${TICKET_ID} gen ${GENERATION})" >&2
-  exec claudish --interactive --session-id "$SESSION_ID" "${CLAUDE_ARGS[@]+"${CLAUDE_ARGS[@]}"}"
+  exec claudish --interactive --session-id "$SESSION_ID" --name "$SESSION_NAME" "${CLAUDE_ARGS[@]+"${CLAUDE_ARGS[@]}"}"
 fi
