@@ -77,11 +77,8 @@ cmd_start() {
   local worktree_path
   worktree_path=$(ollo use-worktree "$ticket_id")
 
-  # Create tmux session
-  tmux new-session -d -s "$ticket_id" -c "$worktree_path"
-
-  # Send command to start claude
-  tmux send-keys -t "$ticket_id" "ollo claude $ticket_id" Enter
+  # Create tmux session running claude
+  tmux new-session -d -s "$ticket_id" -c "$worktree_path" -- direnv exec . ollo claude "$ticket_id"
 
   # Write initial session JSON
   write_session "$ticket_id" ".ticketId = \"$ticket_id\" | .tmuxSession = \"$ticket_id\" | .phase = \"planning\" | .attention = false | .activeSubtask = null | .pid = null | .startedAt = \"$(now_iso)\" | .lastUpdated = \"$(now_iso)\""
@@ -134,14 +131,8 @@ cmd_plan() {
     exit 1
   fi
 
-  # Send C-c to kill current process
-  tmux send-keys -t "$ticket_id" C-c
-
-  # Wait briefly
-  sleep 1
-
-  # Send new command
-  tmux send-keys -t "$ticket_id" "ollo claude $ticket_id" Enter
+  # Kill current process and start claude
+  tmux respawn-pane -k -t "$ticket_id" "direnv exec . ollo claude $ticket_id"
 
   # Update session JSON
   write_session "$ticket_id" ".phase = \"planning\" | .attention = false | .lastUpdated = \"$(now_iso)\""
@@ -159,14 +150,8 @@ cmd_decompose() {
     exit 1
   fi
 
-  # Send C-c to kill current process
-  tmux send-keys -t "$ticket_id" C-c
-
-  # Wait briefly
-  sleep 1
-
-  # Send decompose command
-  tmux send-keys -t "$ticket_id" "ollo claude $ticket_id -- -p '/ollo:decompose'" Enter
+  # Kill current process and start decompose
+  tmux respawn-pane -k -t "$ticket_id" "direnv exec . ollo claude $ticket_id -- -p '/ollo:decompose'"
 
   # Update session JSON
   write_session "$ticket_id" ".phase = \"decomposing\" | .attention = false | .lastUpdated = \"$(now_iso)\""
@@ -184,14 +169,8 @@ cmd_execute() {
     exit 1
   fi
 
-  # Send C-c to kill current process
-  tmux send-keys -t "$ticket_id" C-c
-
-  # Wait briefly
-  sleep 1
-
-  # Send execute command
-  tmux send-keys -t "$ticket_id" "ollo ralph $ticket_id" Enter
+  # Kill current process and start execution
+  tmux respawn-pane -k -t "$ticket_id" "direnv exec . ollo ralph $ticket_id"
 
   # Update session JSON
   write_session "$ticket_id" ".phase = \"executing\" | .attention = false | .lastUpdated = \"$(now_iso)\""
