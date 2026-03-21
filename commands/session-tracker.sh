@@ -166,7 +166,15 @@ cmd_execute() {
   fi
 
   # Kill current process and start execution
-  tmux respawn-pane -k -t "$ticket_id" "direnv exec . ollo ralph $ticket_id"
+  if [[ "${OLLO_WORKTREES_ENABLED:-}" == "true" ]]; then
+    # Get the main worktree path before switching
+    local main_worktree
+    main_worktree=$(pwd)
+
+    tmux respawn-pane -k -t "$ticket_id" "worktree_path=\$(ollo use-worktree $ticket_id) && cd \"\$worktree_path\" && direnv exec . ollo ralph $ticket_id; cd $main_worktree && git worktree remove \"\$worktree_path\""
+  else
+    tmux respawn-pane -k -t "$ticket_id" "direnv exec . ollo ralph $ticket_id"
+  fi
 
   # Update session JSON
   write_session "$ticket_id" ".phase = \"executing\" | .attention = false | .lastUpdated = \"$(now_iso)\""
