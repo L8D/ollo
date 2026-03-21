@@ -91,10 +91,28 @@ kota documents create \
     }
   ' "$TRANSCRIPT" 2>/dev/null | tail -n +2)
 
+  # Step 2b: Extract user feedback from ExitPlanMode rejections
+  EXIT_REJECTIONS=$(jq -c '
+    [.[] | select(.type == "assistant") |
+      .message.content[]? | select(.type == "tool_use" and .name == "ExitPlanMode") |
+      {tool_id: .id}
+    ] as $exit_calls |
+    [.[] | select(.type == "user") | .uuid as $uuid |
+      .message.content[]? | select(.type == "tool_result") |
+      select(.content | type == "string" and test("The user doesn.t want to proceed")) |
+      {uuid: $uuid, tool_use_id: .tool_use_id, content: .content}
+    ] as $rejections |
+    $exit_calls[] |
+    . as $ec |
+    ($rejections[] | select(.tool_use_id == $ec.tool_id)) as $r |
+    {uuid: $r.uuid, type: "exit_rejection",
+     message: ($r.content | split("the user said:\n") | if length > 1 then .[1] else "" end)}
+  ' <(jq -s '.' "$TRANSCRIPT") 2>/dev/null)
+
   # Step 3: Format clarifications as blockquoted section (without header)
   CLARIFICATIONS_FILE=$(mktemp)
   {
-    if [ -n "$AQ_CONTENT" ] || [ -n "$USER_CONTENT" ]; then
+    if [ -n "$AQ_CONTENT" ] || [ -n "$USER_CONTENT" ] || [ -n "$EXIT_REJECTIONS" ]; then
       # Process AskUserQuestion entries
       if [ -n "$AQ_CONTENT" ]; then
         while IFS= read -r line; do
@@ -151,6 +169,31 @@ kota documents create \
 
           echo ">"
         done <<<"$USER_CONTENT"
+      fi
+
+      # Process ExitPlanMode rejection feedback
+      if [ -n "$EXIT_REJECTIONS" ]; then
+        while IFS= read -r line; do
+          if [ -z "$line" ]; then
+            continue
+          fi
+
+          UUID=$(echo "$line" | jq -r '.uuid')
+          MESSAGE=$(echo "$line" | jq -r '.message // ""')
+
+          echo "> <!-- uuid:$UUID -->"
+
+          # Format multi-line rejection feedback with blockquote prefix
+          echo "$MESSAGE" | while IFS= read -r msg_line; do
+            if [ -z "$msg_line" ]; then
+              echo ">"
+            else
+              echo "> **User (plan feedback):** $msg_line"
+            fi
+          done
+
+          echo ">"
+        done <<<"$EXIT_REJECTIONS"
       fi
     fi
   } >"$CLARIFICATIONS_FILE"
