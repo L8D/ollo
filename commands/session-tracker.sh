@@ -5,7 +5,7 @@ set -euo pipefail
 # Manages tmux sessions, phase transitions, and attention state for tickets.
 #
 # Usage: ollo session-tracker <command> [TICKET_ID]
-# Commands: start, stop, restart, plan, decompose, execute, review, status, list, set-attention, clear-attention, set-ready, set-planning
+# Commands: start, stop, restart, plan, decompose, execute, review, status, list, set-attention, clear-attention, set-ready, set-planning, prefill-planning-prompt
 
 SESSIONS_DIR=".ollo/sessions"
 
@@ -355,6 +355,30 @@ cmd_set_planning() {
   write_session "$ticket_id" ".phase = \"planning\" | .lastUpdated = \"$(now_iso)\""
 }
 
+# ─── Sub-command: prefill-planning-prompt ────────────────────────────────────
+
+cmd_prefill_planning_prompt() {
+  local ticket_id="$1"
+
+  if [[ -z "$ticket_id" ]]; then
+    echo "Usage: ollo session-tracker prefill-planning-prompt <TICKET_ID>" >&2
+    exit 1
+  fi
+
+  # Get ticket title from kota
+  local title
+  title=$(kota tickets read "$ticket_id" 2>/dev/null | jq -r '.title // ""' || true)
+
+  # Build the prefill text: "TICKET_ID title" followed by two newlines
+  # The two newlines create a visual separator for the user to type below
+  local prefill_text
+  prefill_text=$(printf '%s %s\n\n' "$ticket_id" "$title")
+
+  # Use tmux send-keys with -l (literal) flag to insert text without
+  # interpreting escape sequences. This does NOT press Enter/submit.
+  tmux send-keys -t "$ticket_id" -l "$prefill_text"
+}
+
 # ─── Dispatcher ──────────────────────────────────────────────────────────────
 
 subcmd="${1:-}"
@@ -374,8 +398,9 @@ case "$subcmd" in
   clear-attention) cmd_clear_attention "$@" ;;
   set-ready) cmd_set_ready "$@" ;;
   set-planning) cmd_set_planning "$@" ;;
+  prefill-planning-prompt) cmd_prefill_planning_prompt "$@" ;;
   *)
-    echo "Usage: ollo session-tracker <start|stop|restart|plan|decompose|execute|review|status|list|set-attention|clear-attention|set-ready|set-planning> [TICKET_ID]" >&2
+    echo "Usage: ollo session-tracker <start|stop|restart|plan|decompose|execute|review|status|list|set-attention|clear-attention|set-ready|set-planning|prefill-planning-prompt> [TICKET_ID]" >&2
     exit 1
     ;;
 esac
