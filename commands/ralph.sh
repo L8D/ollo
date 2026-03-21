@@ -339,6 +339,8 @@ main() {
 
     local subtask_id=$(echo "$task_json" | jq -r '.subtask_id')
     local issue_id_from_task=$(echo "$task_json" | jq -r '.issue_id')
+    local subtask_title=$(echo "$task_json" | jq -r '.subtask_title // ""')
+    local session_name="${issue_id_from_task}, ${subtask_id}: ${subtask_title}"
 
     log "$CYAN" "=== Starting $subtask_id ($issue_id_from_task) ==="
 
@@ -377,9 +379,9 @@ ${doc_content}
         exit 1
       fi
       log "$CYAN" "Using --resume $resume_session_id for first iteration"
-      (claude --settings "$RALPH_SETTINGS" --permission-mode acceptEdits --output-format stream-json --verbose --resume "$resume_session_id" -p "${RALPH_CONTINUE_MSG:-continue}" 2>&1 | parse_streaming_json) &
+      (claude --settings "$RALPH_SETTINGS" --permission-mode acceptEdits --output-format stream-json --verbose --name "$session_name" --resume "$resume_session_id" -p "${RALPH_CONTINUE_MSG:-continue}" 2>&1 | parse_streaming_json) &
     else
-      (claude --settings "$RALPH_SETTINGS" --permission-mode acceptEdits --output-format stream-json --verbose -p "$prompt" 2>&1 | parse_streaming_json) &
+      (claude --settings "$RALPH_SETTINGS" --permission-mode acceptEdits --output-format stream-json --verbose --name "$session_name" -p "$prompt" 2>&1 | parse_streaming_json) &
     fi
     PIPELINE_PID=$!
     wait $PIPELINE_PID 2>/dev/null
@@ -421,6 +423,7 @@ ${doc_content}
           --permission-mode acceptEdits \
           --output-format stream-json \
           --verbose \
+          --name "$session_name" \
           --resume "$soft_resume_session_id" \
           -p "$user_message" 2>&1 | parse_streaming_json) &
         PIPELINE_PID=$!
