@@ -1,5 +1,27 @@
 {
   "hooks": {
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "ollo session-tracker set-attention \"$KOTA_CURRENT_TICKET_ID\"",
+            "async": true
+          }
+        ]
+      }
+    ],
+    "PermissionRequest": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "ollo session-tracker set-attention \"$KOTA_CURRENT_TICKET_ID\"",
+            "async": true
+          }
+        ]
+      }
+    ],
     "PreToolUse": [
       {
         "matcher": "ExitPlanMode",
@@ -7,6 +29,16 @@
           {
             "type": "command",
             "command": "ollo backup-plan-on-exit"
+          }
+        ]
+      },
+      {
+        "matcher": "AskUserQuestion|ExitPlanMode",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "ollo session-tracker set-attention \"$KOTA_CURRENT_TICKET_ID\"",
+            "async": true
           }
         ]
       }
