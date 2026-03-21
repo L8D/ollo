@@ -5,7 +5,7 @@ set -euo pipefail
 # Manages tmux sessions, phase transitions, and attention state for tickets.
 #
 # Usage: ollo session-tracker <command> [TICKET_ID]
-# Commands: start, start-with-prompt, stop, restart, plan, decompose, execute, review, status, list, set-attention, clear-attention, set-ready, set-planning, set-planned, prefill-planning-prompt
+# Commands: start, start-with-prompt, stop, restart, plan, decompose, execute, review, status, list, set-attention, clear-attention, set-ready, set-planning, set-planned, prefill-planning-prompt, set-active-subtask, clear-active-subtask
 
 SESSIONS_DIR=".ollo/sessions"
 
@@ -203,7 +203,7 @@ cmd_execute() {
   fi
 
   # Update session JSON
-  write_session "$ticket_id" ".phase = \"executing\" | .attention = false | .lastUpdated = \"$(now_iso)\""
+  write_session "$ticket_id" ".phase = \"executing\" | .attention = false | .activeSubtask = null | .lastUpdated = \"$(now_iso)\""
 
   echo "Phase transition to executing: $ticket_id" >&2
 }
@@ -426,6 +426,35 @@ cmd_prefill_planning_prompt() {
   tmux send-keys -t "$ticket_id" Enter
 }
 
+# ─── Sub-command: set-active-subtask ─────────────────────────────────────────
+
+cmd_set_active_subtask() {
+  local ticket_id="$1"
+  local subtask_label="$2"
+
+  if [[ -z "$ticket_id" || -z "$subtask_label" ]]; then
+    echo "Usage: ollo session-tracker set-active-subtask <TICKET_ID> <LABEL>" >&2
+    exit 1
+  fi
+
+  # Escape double quotes in label for safe jq interpolation
+  local escaped_label="${subtask_label//\"/\\\"}"
+  write_session "$ticket_id" ".activeSubtask = \"${escaped_label}\" | .lastUpdated = \"$(now_iso)\""
+}
+
+# ─── Sub-command: clear-active-subtask ───────────────────────────────────────
+
+cmd_clear_active_subtask() {
+  local ticket_id="$1"
+
+  if [[ -z "$ticket_id" ]]; then
+    echo "Usage: ollo session-tracker clear-active-subtask <TICKET_ID>" >&2
+    exit 1
+  fi
+
+  write_session "$ticket_id" ".activeSubtask = null | .lastUpdated = \"$(now_iso)\""
+}
+
 # ─── Dispatcher ──────────────────────────────────────────────────────────────
 
 subcmd="${1:-}"
@@ -448,8 +477,10 @@ case "$subcmd" in
   set-planning) cmd_set_planning "$@" ;;
   set-planned) cmd_set_planned "$@" ;;
   prefill-planning-prompt) cmd_prefill_planning_prompt "$@" ;;
+  set-active-subtask) cmd_set_active_subtask "$@" ;;
+  clear-active-subtask) cmd_clear_active_subtask "$@" ;;
   *)
-    echo "Usage: ollo session-tracker <start|start-with-prompt|stop|restart|plan|decompose|execute|review|status|list|set-attention|clear-attention|set-ready|set-planning|set-planned|prefill-planning-prompt> [TICKET_ID]" >&2
+    echo "Usage: ollo session-tracker <start|start-with-prompt|stop|restart|plan|decompose|execute|review|status|list|set-attention|clear-attention|set-ready|set-planning|set-planned|prefill-planning-prompt|set-active-subtask|clear-active-subtask> [TICKET_ID]" >&2
     exit 1
     ;;
 esac
