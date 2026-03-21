@@ -2,11 +2,12 @@
 set -euo pipefail
 
 # ─── Arg parsing ────────────────────────────────────────────────────────────
-# Usage: ollo claude <TICKET_ID> [--reset] [-- claude args...]
-# Everything before '--' is parsed by ollo; everything after '--' forwarded to claudish.
+# Usage: ollo claude <TICKET_ID> [--reset] [--claudish] [-- claude args...]
+# Everything before '--' is parsed by ollo; everything after '--' forwarded to claude.
 
 TICKET_ID=""
 RESET=false
+USE_CLAUDISH=false
 OLLO_ARGS=()
 CLAUDE_ARGS=()
 PAST_SEPARATOR=false
@@ -18,6 +19,8 @@ for arg in "$@"; do
     PAST_SEPARATOR=true
   elif [[ "$arg" == "--reset" ]]; then
     RESET=true
+  elif [[ "$arg" == "--claudish" ]]; then
+    USE_CLAUDISH=true
   elif [[ -z "$TICKET_ID" ]]; then
     TICKET_ID="$arg"
   else
@@ -26,8 +29,15 @@ for arg in "$@"; do
 done
 
 if [[ -z "$TICKET_ID" ]]; then
-  echo "Usage: ollo claude <TICKET_ID> [--reset] [-- claude args...]" >&2
+  echo "Usage: ollo claude <TICKET_ID> [--reset] [--claudish] [-- claude args...]" >&2
   exit 1
+fi
+
+# ─── Determine CLI executable ───────────────────────────────────────────────
+if [[ "${USE_CLAUDISH:-false}" == "true" || "${OLLO_CLAUDISH_ENABLED:-}" == "true" ]]; then
+  CLAUDE_CMD=claudish
+else
+  CLAUDE_CMD=claude
 fi
 
 # ─── Environment ────────────────────────────────────────────────────────────
@@ -63,8 +73,8 @@ TRANSCRIPT_FILE="$HOME/.claude/projects/${PROJECT_KEY}/${SESSION_ID}.jsonl"
 
 if [[ -f "$TRANSCRIPT_FILE" ]]; then
   echo "Session $SESSION_ID exists — resuming. (${TICKET_ID} gen ${GENERATION})" >&2
-  exec claudish --interactive --resume "$SESSION_ID" --name "$SESSION_NAME" "${CLAUDE_ARGS[@]+"${CLAUDE_ARGS[@]}"}"
+  exec "$CLAUDE_CMD" --interactive --resume "$SESSION_ID" --name "$SESSION_NAME" "${CLAUDE_ARGS[@]+"${CLAUDE_ARGS[@]}"}"
 else
   echo "Session $SESSION_ID not found — creating. (${TICKET_ID} gen ${GENERATION})" >&2
-  exec claudish --interactive --session-id "$SESSION_ID" --name "$SESSION_NAME" "${CLAUDE_ARGS[@]+"${CLAUDE_ARGS[@]}"}"
+  exec "$CLAUDE_CMD" --interactive --session-id "$SESSION_ID" --name "$SESSION_NAME" "${CLAUDE_ARGS[@]+"${CLAUDE_ARGS[@]}"}"
 fi
