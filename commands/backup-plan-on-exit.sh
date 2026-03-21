@@ -91,16 +91,10 @@ kota documents create \
     }
   ' "$TRANSCRIPT" 2>/dev/null | tail -n +2)
 
-  # Step 3: Format clarifications as blockquoted section
+  # Step 3: Format clarifications as blockquoted section (without header)
   CLARIFICATIONS_FILE=$(mktemp)
   {
     if [ -n "$AQ_CONTENT" ] || [ -n "$USER_CONTENT" ]; then
-      echo ""
-      echo "---"
-      echo ""
-      echo "> ## Planning Clarifications"
-      echo ">"
-
       # Process AskUserQuestion entries
       if [ -n "$AQ_CONTENT" ]; then
         while IFS= read -r line; do
@@ -161,31 +155,35 @@ kota documents create \
     fi
   } >"$CLARIFICATIONS_FILE"
 
-  # Step 4: Append only new items to ticket description (UUID-based deduplication)
+  # Step 4: Append only new items to ticket description (block-based UUID deduplication)
   if [ -s "$CLARIFICATIONS_FILE" ]; then
     CURRENT_DESC=$(kota tickets read "$KOTA_CURRENT_TICKET_ID" 2>/dev/null | jq -r '.description // ""' || true)
 
-    if [ -n "$CURRENT_DESC" ]; then
-      # Filter out items whose UUIDs are already in the description
-      FILTERED_CLARIFICATIONS=""
-      while IFS= read -r line; do
-        if [[ "$line" =~ uuid:([a-zA-Z0-9-]+) ]]; then
-          UUID_TO_CHECK="${BASH_REMATCH[1]}"
-          if ! echo "$CURRENT_DESC" | grep -q "uuid:$UUID_TO_CHECK"; then
-            FILTERED_CLARIFICATIONS+="$line"$'\n'
-          fi
+    # Filter out blocks whose UUIDs are already in the description
+    FILTERED_CLARIFICATIONS=""
+    SKIP_BLOCK=false
+    while IFS= read -r line; do
+      if [[ "$line" =~ uuid:([a-zA-Z0-9-]+) ]]; then
+        UUID_TO_CHECK="${BASH_REMATCH[1]}"
+        if [ -n "$CURRENT_DESC" ] && echo "$CURRENT_DESC" | grep -qF "uuid:$UUID_TO_CHECK"; then
+          SKIP_BLOCK=true
         else
+          SKIP_BLOCK=false
           FILTERED_CLARIFICATIONS+="$line"$'\n'
         fi
-      done <"$CLARIFICATIONS_FILE"
-
-      if [ -n "$FILTERED_CLARIFICATIONS" ]; then
-        COMBINED_DESC="${CURRENT_DESC}${FILTERED_CLARIFICATIONS}"
-        kota tickets update "$KOTA_CURRENT_TICKET_ID" --description "$COMBINED_DESC" >/dev/null 2>&1 || true
+      elif ! $SKIP_BLOCK; then
+        FILTERED_CLARIFICATIONS+="$line"$'\n'
       fi
-    else
-      # No existing description, just append the clarifications
-      kota tickets update "$KOTA_CURRENT_TICKET_ID" --description "$(cat "$CLARIFICATIONS_FILE")" >/dev/null 2>&1 || true
+    done <"$CLARIFICATIONS_FILE"
+
+    if [ -n "$FILTERED_CLARIFICATIONS" ]; then
+      # Only add header if description doesn't already have one
+      if [ -z "$CURRENT_DESC" ] || ! echo "$CURRENT_DESC" | grep -qF "## Planning Clarifications"; then
+        HEADER=$'\n---\n\n> ## Planning Clarifications\n>\n'
+        FILTERED_CLARIFICATIONS="${HEADER}${FILTERED_CLARIFICATIONS}"
+      fi
+      COMBINED_DESC="${CURRENT_DESC}${FILTERED_CLARIFICATIONS}"
+      kota tickets update "$KOTA_CURRENT_TICKET_ID" --description "$COMBINED_DESC" >/dev/null 2>&1 || true
     fi
   fi
 
