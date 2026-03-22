@@ -75,6 +75,7 @@ if kota tickets read "$TICKET_ID" 2>/dev/null | jq -r '.description' >"$TEMP_DES
 
     if kota tickets update "$TICKET_ID" --description "$(cat "$TEMP_UPDATED")" >/dev/null 2>&1; then
       MARK_RESULT="completed"
+      ollo emit "$TICKET_ID" TicketDescriptionUpdated
     else
       MARK_RESULT="failed"
       MARK_ERROR="Failed to update ticket description"
