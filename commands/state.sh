@@ -55,9 +55,12 @@ if [[ -f "$SESSION_FILE" ]]; then
               else . end
           elif $e.tool == "AskUserQuestion" then
             .attention = true
-          elif $e.tool == "Skill" and ($e.skill | tostring | test("decompose")) then
-            .phase = "decomposing"
           else . end
+        else . end
+
+      elif $e.name == "SkillInvoked" then
+        if ($e.skill | tostring | test("decompose")) then
+          .phase = "decomposing"
         else . end
 
       elif $e.name == "GenerationReset" then

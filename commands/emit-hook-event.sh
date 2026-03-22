@@ -38,10 +38,6 @@ case "$HOOK_TYPE" in
   PreToolUse)
     TOOL_NAME=$(echo "$INPUT" | jq -r '.tool_name // ""')
     EMIT_ARGS+=("tool=$TOOL_NAME")
-    if [[ "$TOOL_NAME" == "Skill" ]]; then
-      SKILL=$(echo "$INPUT" | jq -r '.tool_input.skill // ""')
-      EMIT_ARGS+=("skill=$SKILL")
-    fi
     ;;
   UserPromptSubmit)
     PROJECT_KEY="$(echo "$CWD" | tr '/' '-' | tr '.' '-')"

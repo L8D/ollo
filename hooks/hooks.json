@@ -62,16 +62,6 @@
             "async": true
           }
         ]
-      },
-      {
-        "matcher": "Skill",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "ollo emit-hook-event PreToolUse",
-            "async": true
-          }
-        ]
       }
     ],
     "UserPromptSubmit": [
