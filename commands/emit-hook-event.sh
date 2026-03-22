@@ -35,6 +35,10 @@ EMIT_ARGS=(
 
 # ─── Extract hook-type-specific fields ──────────────────────────────────────
 case "$HOOK_TYPE" in
+  SessionStart)
+    SOURCE=$(echo "$INPUT" | jq -r '.source // ""')
+    EMIT_ARGS+=("source=$SOURCE")
+    ;;
   PreToolUse)
     TOOL_NAME=$(echo "$INPUT" | jq -r '.tool_name // ""')
     EMIT_ARGS+=("tool=$TOOL_NAME")
