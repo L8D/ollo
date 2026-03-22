@@ -28,7 +28,7 @@ if [[ -f "$SESSION_FILE" ]]; then
       if $e.name == "TmuxSessionCreated" then
         .tmuxSession = $e.tmuxSession
         | .startedAt = $e.ts
-        | .phase = "started"
+        | .phase = (if $e.mode == "ralph" then "executing" else "started" end)
         | .attention = false
         | .synced = false
         | .startedWithPrompt = ($e.startedWithPrompt == "true")
