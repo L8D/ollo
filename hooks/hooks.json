@@ -5,7 +5,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "coop set-attention \"$KOTA_CURRENT_TICKET_ID\"",
+            "command": "ollo emit-hook-event Stop",
             "async": true
           }
         ]
@@ -16,7 +16,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "coop set-attention \"$KOTA_CURRENT_TICKET_ID\"",
+            "command": "ollo emit-hook-event PermissionRequest",
             "async": true
           }
         ]
@@ -27,7 +27,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "coop set-ready \"$KOTA_CURRENT_TICKET_ID\"",
+            "command": "ollo emit-hook-event SessionStart",
             "async": true
           }
         ]
@@ -44,21 +44,31 @@
         ]
       },
       {
-        "matcher": "AskUserQuestion",
+        "matcher": "ExitPlanMode",
         "hooks": [
           {
             "type": "command",
-            "command": "coop set-attention \"$KOTA_CURRENT_TICKET_ID\"",
+            "command": "ollo emit-hook-event PreToolUse",
             "async": true
           }
         ]
       },
       {
-        "matcher": "ExitPlanMode",
+        "matcher": "AskUserQuestion",
         "hooks": [
           {
             "type": "command",
-            "command": "coop set-planned \"$KOTA_CURRENT_TICKET_ID\"",
+            "command": "ollo emit-hook-event PreToolUse",
+            "async": true
+          }
+        ]
+      },
+      {
+        "matcher": "Skill",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "ollo emit-hook-event PreToolUse",
             "async": true
           }
         ]
@@ -70,6 +80,15 @@
           {
             "type": "command",
             "command": "ollo sync-description-on-prompt"
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "ollo emit-hook-event UserPromptSubmit",
+            "async": true
           }
         ]
       }
