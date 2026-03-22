@@ -197,9 +197,9 @@ cmd_execute() {
     local main_worktree
     main_worktree=$(pwd)
 
-    tmux respawn-pane -k -t "$ticket_id" "worktree_path=\$(ollo use-worktree $ticket_id) && cd \"\$worktree_path\" && direnv exec . ollo ralph $ticket_id; cd $main_worktree && git worktree remove \"\$worktree_path\""
+    tmux respawn-pane -k -t "$ticket_id" "direnv exec . ollo create-subtasks-from-decomposition-plan --from-ticket $ticket_id && worktree_path=\$(ollo use-worktree $ticket_id) && cd \"\$worktree_path\" && direnv exec . ollo ralph $ticket_id; cd $main_worktree && git worktree remove \"\$worktree_path\""
   else
-    tmux respawn-pane -k -t "$ticket_id" "branch_name=\$(kota tickets read $ticket_id | jq -r '.branchName') && [ \"\$(git rev-parse --abbrev-ref HEAD)\" != \"\$branch_name\" ] && git-spice branch create --no-commit \"\$branch_name\"; direnv exec . ollo ralph $ticket_id"
+    tmux respawn-pane -k -t "$ticket_id" "direnv exec . ollo create-subtasks-from-decomposition-plan --from-ticket $ticket_id && branch_name=\$(kota tickets read $ticket_id | jq -r '.branchName') && [ \"\$(git rev-parse --abbrev-ref HEAD)\" != \"\$branch_name\" ] && git-spice branch create --no-commit \"\$branch_name\"; direnv exec . ollo ralph $ticket_id"
   fi
 
   # Update session JSON
