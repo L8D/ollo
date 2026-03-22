@@ -153,6 +153,14 @@ if [ "$CREATED_COUNT" -gt 0 ]; then
   fi
 fi
 
+# Emit log event (only if subtasks were actually created)
+if [ "$CREATED_COUNT" -gt 0 ]; then
+  ollo emit "$ISSUE_ID" SubtasksCreated \
+    --origin=create-subtasks \
+    created="$CREATED_COUNT" \
+    failed="$FAILED_COUNT"
+fi
+
 # Output JSON summary
 jq -n \
   --arg issue_id "$ISSUE_ID" \
