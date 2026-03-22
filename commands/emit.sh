@@ -2,31 +2,32 @@
 set -euo pipefail
 
 # ─── Usage ───────────────────────────────────────────────────────────────────
-# ollo emit TICKET_ID EVENT_NAME [--origin=SOURCE] [key=value...]
+# ollo emit [--origin=SOURCE] TICKET_ID EVENT_NAME [key=value...]
 #
 # Appends a JSON event line to .ollo/sessions/TICKET_ID.jsonl
 # Graceful no-op if TICKET_ID is empty.
 
-TICKET_ID="${1:-}"
-if [[ -z "$TICKET_ID" ]]; then
-  exit 0
-fi
-shift
-
-EVENT_NAME="${1:?Usage: ollo emit TICKET_ID EVENT_NAME [--origin=SOURCE] [key=value...]}"
-shift
-
-# ─── Parse remaining args ────────────────────────────────────────────────────
+# ─── Parse all args, separating flags from positionals ───────────────────────
 ORIGIN=""
+POSITIONALS=()
 KV_PAIRS=()
 
 for arg in "$@"; do
   if [[ "$arg" == --origin=* ]]; then
     ORIGIN="${arg#--origin=}"
-  else
+  elif [[ "$arg" == *=* && "$arg" != --* ]]; then
     KV_PAIRS+=("$arg")
+  else
+    POSITIONALS+=("$arg")
   fi
 done
+
+TICKET_ID="${POSITIONALS[0]:-}"
+if [[ -z "$TICKET_ID" ]]; then
+  exit 0
+fi
+
+EVENT_NAME="${POSITIONALS[1]:?Usage: ollo emit [--origin=SOURCE] TICKET_ID EVENT_NAME [key=value...]}"
 
 # ─── Build JSON ──────────────────────────────────────────────────────────────
 TS="$(date -u +%Y-%m-%dT%H:%M:%SZ)"
