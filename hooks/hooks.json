@@ -5,7 +5,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "ollo session-tracker set-attention \"$KOTA_CURRENT_TICKET_ID\"",
+            "command": "coop set-attention \"$KOTA_CURRENT_TICKET_ID\"",
             "async": true
           }
         ]
@@ -16,7 +16,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "ollo session-tracker set-attention \"$KOTA_CURRENT_TICKET_ID\"",
+            "command": "coop set-attention \"$KOTA_CURRENT_TICKET_ID\"",
             "async": true
           }
         ]
@@ -27,7 +27,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "ollo session-tracker set-ready \"$KOTA_CURRENT_TICKET_ID\"",
+            "command": "coop set-ready \"$KOTA_CURRENT_TICKET_ID\"",
             "async": true
           }
         ]
@@ -48,7 +48,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "ollo session-tracker set-attention \"$KOTA_CURRENT_TICKET_ID\"",
+            "command": "coop set-attention \"$KOTA_CURRENT_TICKET_ID\"",
             "async": true
           }
         ]
@@ -58,7 +58,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "ollo session-tracker set-planned \"$KOTA_CURRENT_TICKET_ID\"",
+            "command": "coop set-planned \"$KOTA_CURRENT_TICKET_ID\"",
             "async": true
           }
         ]

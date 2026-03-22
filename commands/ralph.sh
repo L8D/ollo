@@ -337,7 +337,7 @@ main() {
     # Check if all complete
     if [[ "$(echo "$task_json" | jq -r '.all_complete // false')" == "true" ]]; then
       log "$GREEN" "All tasks complete!"
-      ollo session-tracker clear-active-subtask "$issue_id"
+      coop clear-active-subtask "$issue_id"
       EXIT_STATUS="success"
       EXIT_MESSAGE="All tasks complete"
       break
@@ -349,7 +349,7 @@ main() {
     local session_name="${issue_id_from_task}, ${subtask_id}: ${subtask_title}"
 
     subtask_counter=$((subtask_counter + 1))
-    ollo session-tracker set-active-subtask "$issue_id" "(${subtask_counter}/${total_subtasks}) ${subtask_id}"
+    coop set-active-subtask "$issue_id" "(${subtask_counter}/${total_subtasks}) ${subtask_id}"
 
     log "$CYAN" "=== Starting $subtask_id ($issue_id_from_task) ==="
 
@@ -476,7 +476,7 @@ ${doc_content}
     local post_task_json
     post_task_json=$(ollo next-subtask $issue_id 2>/dev/null) || {
       log "$RED" "Failed to check task status"
-      ollo session-tracker clear-active-subtask "$issue_id"
+      coop clear-active-subtask "$issue_id"
       EXIT_MESSAGE="Failed to check task status"
       exit 1
     }
@@ -484,7 +484,7 @@ ${doc_content}
     # Check if all complete now
     if [[ "$(echo "$post_task_json" | jq -r '.all_complete // false')" == "true" ]]; then
       log "$GREEN" "All tasks complete!"
-      ollo session-tracker clear-active-subtask "$issue_id"
+      coop clear-active-subtask "$issue_id"
       EXIT_STATUS="success"
       EXIT_MESSAGE="All tasks complete"
       break
@@ -495,7 +495,7 @@ ${doc_content}
     # If still on same task, Claude failed to complete it
     if [[ "$post_subtask_id" == "$subtask_id" ]]; then
       log "$RED" "Still on $subtask_id - Claude failed to complete task, exiting"
-      ollo session-tracker clear-active-subtask "$issue_id"
+      coop clear-active-subtask "$issue_id"
       EXIT_MESSAGE="Claude failed to complete task $subtask_id"
       exit 1
     fi
