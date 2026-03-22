@@ -222,7 +222,7 @@ kota documents create \
     if [ -n "$FILTERED_CLARIFICATIONS" ]; then
       # Only add header if description doesn't already have one
       if [ -z "$CURRENT_DESC" ] || ! echo "$CURRENT_DESC" | grep -qF "## Planning Clarifications"; then
-        HEADER=$'\n---\n\n> ## Planning Clarifications\n>\n'
+        HEADER=$'\n\n---\n\n> ## Planning Clarifications\n>\n'
         FILTERED_CLARIFICATIONS="${HEADER}${FILTERED_CLARIFICATIONS}"
       fi
       COMBINED_DESC="${CURRENT_DESC}${FILTERED_CLARIFICATIONS}"
