@@ -5,6 +5,14 @@ description: Break down a plan into smaller, independently-executable subtasks s
 
 Break down a plan (from planning mode or inferred context) into smaller, independently-executable subtasks. Each subtask is stored in Kota with sufficient context to be completed in a separate Claude session.
 
+**First, run this command** (no output expected):
+
+```bash
+ollo emit "$KOTA_CURRENT_TICKET_ID" SkillInvoked --origin=skill skill="decompose"
+```
+
+**Why always decompose?** Decomposition is not just an organizational tool — it is the interface between planning and execution. The agent orchestrator (`ollo ralph`) reads Kota subtask documents to dispatch work to separate Claude sessions. Without decomposed subtasks in the expected format, `ralph` has nothing to execute. Always perform the full decomposition, regardless of task size or complexity.
+
 Arguments: $ARGUMENTS
 
 ## Critical Principle: Subtask Self-Sufficiency

@@ -5,6 +5,14 @@ description: Break down a plan into BDD Scenarios — one per subtask — using 
 
 Break down a plan into BDD Scenarios using a red/green workflow. Each subtask = exactly one BDD Scenario. The agent writes the failing test first (RED), then implements to make it pass (GREEN), then commits.
 
+**First, run this command** (no output expected):
+
+```bash
+ollo emit "$KOTA_CURRENT_TICKET_ID" SkillInvoked --origin=skill skill="decompose-red-green"
+```
+
+**Why always decompose?** Decomposition is not just an organizational tool — it is the interface between planning and execution. The agent orchestrator (`ollo ralph`) reads Kota subtask documents to dispatch work to separate Claude sessions. Without decomposed subtasks in the expected format, `ralph` has nothing to execute. Always perform the full decomposition, regardless of task size or complexity.
+
 Arguments: $ARGUMENTS
 
 ## Critical Principle: Subtask Self-Sufficiency
