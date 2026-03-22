@@ -66,9 +66,9 @@ kota documents create \
 {
   # Step 1: Extract AskUserQuestion Q&A pairs
   AQ_CONTENT=$(jq -c '
-    [.[] | select(.type == "assistant") | .uuid as $uuid |
+    [.[] | select(.type == "assistant") | .uuid as $uuid | .timestamp as $ts |
       .message.content[]? | select(.type == "tool_use" and .name == "AskUserQuestion") |
-      {uuid: $uuid, tool_id: .id, questions: .input.questions}
+      {uuid: $uuid, timestamp: $ts, tool_id: .id, questions: .input.questions}
     ] as $tool_uses |
     [.[] | select(.type == "user") |
       .message.content[]? | select(.type == "tool_result") |
@@ -77,7 +77,7 @@ kota documents create \
     $tool_uses[] |
     . as $tu |
     ($results[] | select(.tool_use_id == $tu.tool_id)) as $r |
-    {uuid: $tu.uuid, type: "question", data: {questions: $tu.questions, answer: $r.answer}}
+    {uuid: $tu.uuid, timestamp: $tu.timestamp, type: "question", data: {questions: $tu.questions, answer: $r.answer}}
   ' <(jq -s '.' "$TRANSCRIPT") 2>/dev/null)
 
   # Step 2: Extract user follow-up messages (all except first)
@@ -86,6 +86,7 @@ kota documents create \
     select(.message.content | type == "string") |
     {
       uuid: .uuid,
+      timestamp: .timestamp,
       type: "user_message",
       message: .message.content
     }
@@ -97,15 +98,15 @@ kota documents create \
       .message.content[]? | select(.type == "tool_use" and .name == "ExitPlanMode") |
       {tool_id: .id}
     ] as $exit_calls |
-    [.[] | select(.type == "user") | .uuid as $uuid |
+    [.[] | select(.type == "user") | .uuid as $uuid | .timestamp as $ts |
       .message.content[]? | select(.type == "tool_result") |
       select(.content | type == "string" and test("The user doesn.t want to proceed")) |
-      {uuid: $uuid, tool_use_id: .tool_use_id, content: .content}
+      {uuid: $uuid, timestamp: $ts, tool_use_id: .tool_use_id, content: .content}
     ] as $rejections |
     $exit_calls[] |
     . as $ec |
     ($rejections[] | select(.tool_use_id == $ec.tool_id)) as $r |
-    {uuid: $r.uuid, type: "exit_rejection",
+    {uuid: $r.uuid, timestamp: $r.timestamp, type: "exit_rejection",
      message: ($r.content | split("the user said:\n") | if length > 1 then .[1] else "" end)}
   ' <(jq -s '.' "$TRANSCRIPT") 2>/dev/null)
 
@@ -121,10 +122,15 @@ kota documents create \
           fi
 
           UUID=$(echo "$line" | jq -r '.uuid')
+          RAW_TS=$(echo "$line" | jq -r '.timestamp // ""')
+          DISPLAY_TS=""
+          if [ -n "$RAW_TS" ]; then
+            DISPLAY_TS=$(date -j -f "%Y-%m-%dT%H:%M:%S" "${RAW_TS%%.*}" "+%b %-d, %-I:%M %p" 2>/dev/null || echo "$RAW_TS")
+          fi
           QUESTIONS=$(echo "$line" | jq -r '.data.questions // []')
           ANSWER=$(echo "$line" | jq -r '.data.answer // ""')
 
-          echo "> <!-- uuid:$UUID -->"
+          echo "> <!-- uuid:$UUID --> *${DISPLAY_TS}*"
 
           # Extract and format all questions and options
           QUESTION_TEXT=$(echo "$QUESTIONS" | jq -r '.[] | .question // ""' | head -1)
@@ -154,9 +160,14 @@ kota documents create \
           fi
 
           UUID=$(echo "$line" | jq -r '.uuid')
+          RAW_TS=$(echo "$line" | jq -r '.timestamp // ""')
+          DISPLAY_TS=""
+          if [ -n "$RAW_TS" ]; then
+            DISPLAY_TS=$(date -j -f "%Y-%m-%dT%H:%M:%S" "${RAW_TS%%.*}" "+%b %-d, %-I:%M %p" 2>/dev/null || echo "$RAW_TS")
+          fi
           MESSAGE=$(echo "$line" | jq -r '.message // ""')
 
-          echo "> <!-- uuid:$UUID -->"
+          echo "> <!-- uuid:$UUID --> *${DISPLAY_TS}*"
 
           # Format multi-line user messages with blockquote prefix
           echo "$MESSAGE" | while IFS= read -r msg_line; do
@@ -179,9 +190,14 @@ kota documents create \
           fi
 
           UUID=$(echo "$line" | jq -r '.uuid')
+          RAW_TS=$(echo "$line" | jq -r '.timestamp // ""')
+          DISPLAY_TS=""
+          if [ -n "$RAW_TS" ]; then
+            DISPLAY_TS=$(date -j -f "%Y-%m-%dT%H:%M:%S" "${RAW_TS%%.*}" "+%b %-d, %-I:%M %p" 2>/dev/null || echo "$RAW_TS")
+          fi
           MESSAGE=$(echo "$line" | jq -r '.message // ""')
 
-          echo "> <!-- uuid:$UUID -->"
+          echo "> <!-- uuid:$UUID --> *${DISPLAY_TS}*"
 
           # Format multi-line rejection feedback with blockquote prefix
           echo "$MESSAGE" | while IFS= read -r msg_line; do
