@@ -4,10 +4,10 @@ set -euo pipefail
 # ─── Usage ───────────────────────────────────────────────────────────────────
 # ollo state TICKET_ID
 #
-# Replays .ollo/sessions/TICKET_ID.jsonl to derive current session state.
+# Replays ~/.ollo/sessions/TICKET_ID.jsonl to derive current session state.
 
 TICKET_ID="${1:?Usage: ollo state TICKET_ID}"
-SESSION_FILE=".ollo/sessions/$TICKET_ID.jsonl"
+SESSION_FILE="$HOME/.ollo/sessions/$TICKET_ID.jsonl"
 
 # ─── Derive state from event log ────────────────────────────────────────────
 if [[ -f "$SESSION_FILE" ]]; then

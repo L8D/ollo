@@ -4,7 +4,7 @@ set -euo pipefail
 # ─── Usage ───────────────────────────────────────────────────────────────────
 # ollo emit [--origin=SOURCE] TICKET_ID EVENT_NAME [key=value...]
 #
-# Appends a JSON event line to .ollo/sessions/TICKET_ID.jsonl
+# Appends a JSON event line to ~/.ollo/sessions/TICKET_ID.jsonl
 # Graceful no-op if TICKET_ID is empty.
 
 # ─── Parse all args, separating flags from positionals ───────────────────────
@@ -52,6 +52,6 @@ for kv in "${KV_PAIRS[@]}"; do
 done
 
 # ─── Write event ─────────────────────────────────────────────────────────────
-SESSION_DIR=".ollo/sessions"
+SESSION_DIR="$HOME/.ollo/sessions"
 mkdir -p "$SESSION_DIR"
 jq -nc "$JQ_EXPR" "${JQ_ARGS[@]}" >>"$SESSION_DIR/$TICKET_ID.jsonl"
