@@ -21,22 +21,24 @@ if [[ -f "$SESSION_FILE" ]]; then
         synced: false,
         tmuxSession: null,
         startedAt: null,
-        lastUpdated: null
+        lastUpdated: null,
+        startedWithPrompt: false
       };
 
       if $e.name == "TmuxSessionCreated" then
         .tmuxSession = $e.tmuxSession
         | .startedAt = $e.ts
-        | .phase = "created"
+        | .phase = "started"
         | .attention = false
         | .synced = false
+        | .startedWithPrompt = ($e.startedWithPrompt == "true")
 
       elif $e.name == "TmuxSessionDestroyed" then
         .phase = "stopped"
 
       elif $e.name == "ClaudeHookFired" then
         if $e.hook == "SessionStart" then
-          (if .phase != "decomposing" then .phase = "ready" else . end)
+          (if $e.source == "startup" and .phase != "decomposing" and .startedWithPrompt != true then .phase = "ready" else . end)
           | .attention = false
         elif $e.hook == "Stop" then
           .attention = true
@@ -44,7 +46,8 @@ if [[ -f "$SESSION_FILE" ]]; then
           .attention = true
         elif $e.hook == "UserPromptSubmit" then
           .attention = false
-          | if .phase == "ready" or .phase == "planned" then .phase = "planning"
+          | if .startedWithPrompt == true and .phase == "started" then .phase = "planning"
+            elif .phase == "ready" or .phase == "planned" then .phase = "planning"
             elif .phase == "decomposed" then .phase = "decomposing"
             else . end
         elif $e.hook == "PreToolUse" then
