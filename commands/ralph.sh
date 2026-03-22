@@ -317,6 +317,19 @@ main() {
     esac
   done
 
+  # Infer ticket ID from branch name if not provided
+  if [[ -z "$issue_id" ]]; then
+    local branch
+    branch=$(git rev-parse --abbrev-ref HEAD 2>/dev/null)
+    local prefix="${KOTA_DEFAULT_PREFIX:-snwlly}"
+    local prefix_lower=$(echo "$prefix" | tr '[:upper:]' '[:lower:]')
+    issue_id=$(echo "$branch" | grep -oiE "${prefix_lower}-[0-9]+" | tr '[:lower:]' '[:upper:]' | head -1)
+    if [[ -z "$issue_id" ]]; then
+      echo "Error: No ticket ID provided and could not infer from branch '$branch'" >&2
+      exit 1
+    fi
+  fi
+
   log "$CYAN" "Ralph Stream starting..."
   [[ "$continue_mode" == "true" ]] && log "$CYAN" "Continue mode enabled for first iteration"
 
