@@ -6,16 +6,10 @@ if [ -z "${KOTA_CURRENT_TICKET_ID:-}" ]; then
   exit 0
 fi
 
-# Once-per-session guard: only sync on the first prompt submission
-MARKER=".claude/ollo-sessions/${KOTA_CURRENT_TICKET_ID}.synced"
-if [ -f "$MARKER" ]; then
+# Once-per-session guard: check if description already synced
+CURRENT_STATE=$(ollo state "$KOTA_CURRENT_TICKET_ID" 2>/dev/null || echo '{}')
+if [ "$(echo "$CURRENT_STATE" | jq -r '.synced // false')" = "true" ]; then
   exit 0
-fi
-
-# Transition to planning phase on first prompt (skip if already decomposing)
-current_phase=$(jq -r '.phase // ""' ".coop/sessions/${KOTA_CURRENT_TICKET_ID}.json" 2>/dev/null || true)
-if [[ "$current_phase" != "decomposing" ]]; then
-  coop set-planning "$KOTA_CURRENT_TICKET_ID" 2>/dev/null || true
 fi
 
 # Skip if description sync has been disabled (e.g. started with description as prompt)
@@ -110,8 +104,7 @@ $BLOCKQUOTED"
   kota tickets update "$KOTA_CURRENT_TICKET_ID" --description "$NEW_DESC" >/dev/null 2>&1 || true
 fi
 
-# ─── Step 6: Write marker file ──────────────────────────────────────────────
-mkdir -p ".claude/ollo-sessions"
-touch "$MARKER"
+# ─── Step 6: Record sync event ──────────────────────────────────────────────
+ollo emit "$KOTA_CURRENT_TICKET_ID" TicketDescriptionUpdated --origin=sync-description
 
 exit 0

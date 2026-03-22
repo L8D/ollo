@@ -46,20 +46,16 @@ fi
 export KOTA_CURRENT_TICKET_ID="$TICKET_ID"
 
 # ─── State management ───────────────────────────────────────────────────────
-STATE_DIR=".claude/ollo-sessions"
-mkdir -p "$STATE_DIR"
-STATE_FILE="$STATE_DIR/$TICKET_ID"
-
 if [[ "$RESET" == "true" ]]; then
-  CURRENT=$(cat "$STATE_FILE" 2>/dev/null || echo "0")
+  CURRENT_STATE=$(ollo state "$TICKET_ID" 2>/dev/null || echo '{}')
+  CURRENT=$(echo "$CURRENT_STATE" | jq -r '.generation // 0')
   NEXT=$((CURRENT + 1))
-  printf '%s' "$NEXT" >"$STATE_FILE"
-  rm -f "$STATE_DIR/$TICKET_ID.synced"
+  ollo emit "$TICKET_ID" GenerationReset generation="$NEXT"
   echo "Session reset for $TICKET_ID (generation $NEXT — next invocation will start a new session)" >&2
   exit 0
 fi
 
-GENERATION=$(cat "$STATE_FILE" 2>/dev/null || echo "0")
+GENERATION=$(ollo state "$TICKET_ID" 2>/dev/null | jq -r '.generation // 0')
 
 # ─── Session name with ticket title ──────────────────────────────────────────
 TICKET_TITLE=$(kota tickets read "$TICKET_ID" 2>/dev/null | jq -r '.title // ""')
