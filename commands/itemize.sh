@@ -204,7 +204,7 @@ TITLE
 )" --description "\$(cat <<'DESCRIPTION'
 $DESCRIPTION
 DESCRIPTION
-)" > "\$TICKET_FILE"
+)" --status "Started" > "\$TICKET_FILE"
 TICKET_ID=\$(jq -r '.identifier' "\$TICKET_FILE")
 TICKET_BRANCH_NAME=\$(jq -r '.branchName' "\$TICKET_FILE")
 rm "\$TICKET_FILE"
