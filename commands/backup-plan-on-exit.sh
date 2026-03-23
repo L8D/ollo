@@ -125,7 +125,7 @@ kota documents create \
           RAW_TS=$(echo "$line" | jq -r '.timestamp // ""')
           DISPLAY_TS=""
           if [ -n "$RAW_TS" ]; then
-            DISPLAY_TS=$(date -j -f "%Y-%m-%dT%H:%M:%S" "${RAW_TS%%.*}" "+%b %-d, %-I:%M %p" 2>/dev/null || echo "$RAW_TS")
+            DISPLAY_TS="$RAW_TS"
           fi
           QUESTIONS=$(echo "$line" | jq -r '.data.questions // []')
           ANSWER=$(echo "$line" | jq -r '.data.answer // ""')
@@ -163,7 +163,7 @@ kota documents create \
           RAW_TS=$(echo "$line" | jq -r '.timestamp // ""')
           DISPLAY_TS=""
           if [ -n "$RAW_TS" ]; then
-            DISPLAY_TS=$(date -j -f "%Y-%m-%dT%H:%M:%S" "${RAW_TS%%.*}" "+%b %-d, %-I:%M %p" 2>/dev/null || echo "$RAW_TS")
+            DISPLAY_TS="$RAW_TS"
           fi
           MESSAGE=$(echo "$line" | jq -r '.message // ""')
 
@@ -193,7 +193,7 @@ kota documents create \
           RAW_TS=$(echo "$line" | jq -r '.timestamp // ""')
           DISPLAY_TS=""
           if [ -n "$RAW_TS" ]; then
-            DISPLAY_TS=$(date -j -f "%Y-%m-%dT%H:%M:%S" "${RAW_TS%%.*}" "+%b %-d, %-I:%M %p" 2>/dev/null || echo "$RAW_TS")
+            DISPLAY_TS="$RAW_TS"
           fi
           MESSAGE=$(echo "$line" | jq -r '.message // ""')
 
