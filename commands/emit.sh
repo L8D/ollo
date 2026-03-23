@@ -40,7 +40,7 @@ if [[ -n "$ORIGIN" ]]; then
   JQ_ARGS+=(--arg origin "$ORIGIN")
 fi
 
-for kv in "${KV_PAIRS[@]}"; do
+for kv in "${KV_PAIRS[@]+"${KV_PAIRS[@]}"}"; do
   key="${kv%%=*}"
   value="${kv#*=}"
   if [[ "$value" =~ ^[0-9]+$ ]]; then

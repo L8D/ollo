@@ -34,7 +34,7 @@ while IFS= read -r line; do
   LINES+=("$line")
 done <<<"$PROMPT"
 
-CLEANED=$(printf '%s\n' "${LINES[@]}")
+CLEANED=$(printf '%s\n' "${LINES[@]+"${LINES[@]}"}")
 
 # Step 3B: Handle the header line (ticket ID + title)
 if [ -n "$CLEANED" ]; then
