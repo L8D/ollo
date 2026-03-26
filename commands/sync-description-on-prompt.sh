@@ -68,10 +68,36 @@ if [ -z "$CLEANED" ] || [ -z "$(echo "$CLEANED" | tr -d '[:space:]')" ]; then
   exit 0
 fi
 
-# ─── Step 4: Read current ticket description ────────────────────────────────
+# ─── Step 3E: Read description and skip if prompt content is redundant ──────
 CURRENT_DESC=$(kota tickets read "$KOTA_CURRENT_TICKET_ID" 2>/dev/null | jq -r '.description // ""' || true)
 
-# ─── Step 5: Update based on current state ──────────────────────────────────
+if [ -n "$CURRENT_DESC" ]; then
+  # Check (a): cleaned prompt appears verbatim in description
+  if printf '%s' "$CURRENT_DESC" | grep -qF "$CLEANED"; then
+    ollo emit "$KOTA_CURRENT_TICKET_ID" TicketDescriptionUpdated --origin=sync-description
+    exit 0
+  fi
+
+  # Check (b): cleaned prompt was previously appended as a blockquote
+  CLEANED_BQ=""
+  while IFS= read -r line; do
+    if [ -z "$line" ]; then
+      CLEANED_BQ="$CLEANED_BQ
+> "
+    else
+      CLEANED_BQ="$CLEANED_BQ
+> $line"
+    fi
+  done <<<"$CLEANED"
+  CLEANED_BQ="${CLEANED_BQ:1}"
+
+  if printf '%s' "$CURRENT_DESC" | grep -qF "$CLEANED_BQ"; then
+    ollo emit "$KOTA_CURRENT_TICKET_ID" TicketDescriptionUpdated --origin=sync-description
+    exit 0
+  fi
+fi
+
+# ─── Step 4: Update based on current state ──────────────────────────────────
 if [ -z "$CURRENT_DESC" ]; then
   # Empty description: set directly
   kota tickets update "$KOTA_CURRENT_TICKET_ID" --description "$CLEANED" >/dev/null 2>&1 || true
