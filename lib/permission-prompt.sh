@@ -404,7 +404,7 @@ escaped_description=$(printf '%s' "$tool_description" | sed 's/\\/\\\\/g; s/"/\\
 # Show dialog using choose from list for 4 options
 response=$(
   osascript <<APPLESCRIPT 2>/dev/null
-choose from list {"Allow once", "Always allow", "Deny once", "Always deny"} with prompt "$escaped_description" with title "Ralph Permission: $tool_name" default items {"Allow once"}
+choose from list {"Allow once", "Always allow", "Deny once", "Always deny", "Provide correction"} with prompt "$escaped_description" with title "Ralph Permission: $tool_name" default items {"Allow once"}
 APPLESCRIPT
 ) || {
   # Dialog was cancelled - deny by default
@@ -435,6 +435,20 @@ case "$response" in
       add_permission "$k" "permissions.deny"
     done <<<"$persist_keys"
     printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Permission denied by user (always)"}}\n'
+    ;;
+  "Provide correction")
+    # Walk up the process tree to find the ralph.sh ancestor and send SIGQUIT
+    target_pid=$$
+    while [[ "$target_pid" -gt 1 ]]; do
+      target_pid=$(ps -o ppid= -p "$target_pid" | tr -d ' ')
+      cmd_line=$(ps -o command= -p "$target_pid" 2>/dev/null || true)
+      if [[ "$cmd_line" == *"ralph"* ]]; then
+        kill -QUIT "$target_pid" 2>/dev/null || true
+        break
+      fi
+    done
+    # Deny the tool call — ralph's soft-interrupt handler takes over from here
+    printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"User chose to provide a correction"}}\n'
     ;;
   *)
     # Cancel or unexpected response - deny by default
