@@ -35,6 +35,15 @@
     ],
     "PreToolUse": [
       {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "$OLLO_HOME/lib/permission-prompt.sh",
+            "timeout": 120
+          }
+        ]
+      },
+      {
         "matcher": "ExitPlanMode",
         "hooks": [
           {

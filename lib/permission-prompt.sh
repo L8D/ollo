@@ -1,11 +1,17 @@
 #!/usr/bin/env bash
-# Ralph Permission Prompt Hook
+# Permission Prompt Hook (ralph + interactive)
 # Checks if tool use is allowed/denied in settings.local.json, prompts via osascript if not
 
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 OLLO_HOME="${OLLO_HOME:-"$(cd "$SCRIPT_DIR/.." && pwd)"}"
+
+# Detect mode: ralph uses --settings (sets RALPH_SETTINGS env var), interactive uses OLLO_PERMISSION_PROMPT
+IS_RALPH="${RALPH_SETTINGS:+1}"
+if [[ -z "$IS_RALPH" && "${OLLO_PERMISSION_PROMPT:-}" != "1" ]]; then
+  exit 0
+fi
 
 # SETTINGS_FILE is set below after reading stdin (needs cwd from hook input JSON)
 
@@ -266,7 +272,7 @@ log_missed_permission() {
   local key="$2"
   local input="$3"
 
-  local log_file="$HOME/.claude/ralph-permission-prompt-log.txt"
+  local log_file="$HOME/.claude/permission-prompt-log.txt"
   local timestamp
   timestamp=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
@@ -401,10 +407,18 @@ fi
 # Escape special characters for osascript (double quotes and backslashes)
 escaped_description=$(printf '%s' "$tool_description" | sed 's/\\/\\\\/g; s/"/\\"/g')
 
-# Show dialog using choose from list for 4 options
+# Build dialog options based on mode
+if [[ -n "$IS_RALPH" ]]; then
+  dialog_options='{"Allow once", "Always allow", "Deny once", "Always deny", "Provide correction"}'
+  dialog_title="Ralph Permission: $tool_name"
+else
+  dialog_options='{"Allow once", "Always allow", "Deny once", "Always deny", "Fallback to built-in"}'
+  dialog_title="Permission: $tool_name"
+fi
+
 response=$(
   osascript <<APPLESCRIPT 2>/dev/null
-choose from list {"Allow once", "Always allow", "Deny once", "Always deny", "Provide correction"} with prompt "$escaped_description" with title "Ralph Permission: $tool_name" default items {"Allow once"}
+choose from list $dialog_options with prompt "$escaped_description" with title "$dialog_title" default items {"Allow once"}
 APPLESCRIPT
 ) || {
   # Dialog was cancelled - deny by default
@@ -435,6 +449,10 @@ case "$response" in
       add_permission "$k" "permissions.deny"
     done <<<"$persist_keys"
     printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Permission denied by user (always)"}}\n'
+    ;;
+  "Fallback to built-in")
+    # Output empty JSON — no permissionDecision — so Claude Code's native prompt takes over
+    printf '{}\n'
     ;;
   "Provide correction")
     # Walk up the process tree to find the ralph.sh ancestor and send SIGQUIT
