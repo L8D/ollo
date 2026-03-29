@@ -79,7 +79,7 @@ format_permission_key() {
       command=$(echo "$input" | jq -r '.command // ""')
       permission_key_for_single_command "$command"
       ;;
-    Read | Glob | Grep | Write | Edit | Task | WebFetch | WebSearch | AskUserQuestion | Skill | EnterPlanMode | ExitPlanMode | LSP | NotebookEdit | TaskCreate | TaskGet | TaskList | TaskUpdate | TaskOutput | TaskStop)
+    Read | Glob | Grep | Write | Edit | Agent | Task | WebFetch | WebSearch | AskUserQuestion | Skill | EnterPlanMode | ExitPlanMode | LSP | NotebookEdit | TaskCreate | TaskGet | TaskList | TaskUpdate | TaskOutput | TaskStop)
       # Simple tool names
       echo "$tool"
       ;;
@@ -136,6 +136,12 @@ format_tool_description() {
       desc=$(echo "$input" | jq -r '.description // ""')
       subagent=$(echo "$input" | jq -r '.subagent_type // ""')
       printf "Task: %s - %s" "$subagent" "$desc"
+      ;;
+    Agent)
+      local desc subagent
+      desc=$(echo "$input" | jq -r '.description // ""')
+      subagent=$(echo "$input" | jq -r '.subagent_type // ""')
+      printf "Agent: %s - %s" "$subagent" "$desc"
       ;;
     WebFetch)
       local url
@@ -341,6 +347,20 @@ if [[ "$tool_name" == "Bash" ]]; then
     printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Command matches deny pattern"}}\n'
     exit 0
   fi
+fi
+
+# Auto-approve harmless tools in interactive (non-ralph) sessions.
+# These tools don't modify files or run commands, so they are safe to allow
+# without prompting. This list is intentionally NOT in settings.local.json
+# because that would also auto-approve them for ralph sessions.
+INTERACTIVE_AUTO_APPROVE_TOOLS=(Agent Task ExitPlanMode)
+if [[ -z "$IS_RALPH" ]]; then
+  for _tool in "${INTERACTIVE_AUTO_APPROVE_TOOLS[@]}"; do
+    if [[ "$tool_name" == "$_tool" ]]; then
+      printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"allow"}}\n'
+      exit 0
+    fi
+  done
 fi
 
 # Check if already allowed
