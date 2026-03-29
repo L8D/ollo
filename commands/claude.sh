@@ -50,7 +50,7 @@ if [[ "$RESET" == "true" ]]; then
   CURRENT_STATE=$(ollo state "$TICKET_ID" 2>/dev/null || echo '{}')
   CURRENT=$(echo "$CURRENT_STATE" | jq -r '.generation // 0')
   NEXT=$((CURRENT + 1))
-  ollo emit "$TICKET_ID" GenerationReset generation="$NEXT"
+  ollo emit GenerationReset generation="$NEXT"
   echo "Session reset for $TICKET_ID (generation $NEXT — next invocation will start a new session)" >&2
   exit 0
 fi

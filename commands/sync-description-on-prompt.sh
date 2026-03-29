@@ -75,7 +75,7 @@ CURRENT_DESC=$(kota tickets read "$KOTA_CURRENT_TICKET_ID" 2>/dev/null | jq -r '
 if [ -n "$CURRENT_DESC" ]; then
   # Check (a): cleaned prompt appears verbatim in description
   if printf '%s' "$CURRENT_DESC" | grep -qF "$CLEANED"; then
-    ollo emit "$KOTA_CURRENT_TICKET_ID" TicketDescriptionUpdated --origin=sync-description
+    ollo emit TicketDescriptionUpdated --origin=sync-description
     exit 0
   fi
 
@@ -93,7 +93,7 @@ if [ -n "$CURRENT_DESC" ]; then
   CLEANED_BQ="${CLEANED_BQ:1}"
 
   if printf '%s' "$CURRENT_DESC" | grep -qF "$CLEANED_BQ"; then
-    ollo emit "$KOTA_CURRENT_TICKET_ID" TicketDescriptionUpdated --origin=sync-description
+    ollo emit TicketDescriptionUpdated --origin=sync-description
     exit 0
   fi
 fi
@@ -132,6 +132,6 @@ $BLOCKQUOTED"
 fi
 
 # ─── Step 6: Record sync event ──────────────────────────────────────────────
-ollo emit "$KOTA_CURRENT_TICKET_ID" TicketDescriptionUpdated --origin=sync-description
+ollo emit TicketDescriptionUpdated --origin=sync-description
 
 exit 0

@@ -26,7 +26,6 @@ CWD=$(echo "$INPUT" | jq -r '.cwd // ""')
 
 # ─── Build emit args ───────────────────────────────────────────────────────
 EMIT_ARGS=(
-  "$KOTA_CURRENT_TICKET_ID"
   ClaudeHookFired
   --origin=claude-hook
   "hook=$HOOK_TYPE"

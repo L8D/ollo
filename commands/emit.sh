@@ -2,10 +2,11 @@
 set -euo pipefail
 
 # ─── Usage ───────────────────────────────────────────────────────────────────
-# ollo emit [--origin=SOURCE] TICKET_ID EVENT_NAME [key=value...]
+# ollo emit [--origin=SOURCE] EVENT_NAME [key=value...]
 #
-# Appends a JSON event line to ~/.ollo/sessions/TICKET_ID.jsonl
-# Graceful no-op if TICKET_ID is empty.
+# Appends a JSON event line to ~/.ollo/sessions/$TICKET_ID.jsonl
+# Reads TICKET_ID from KOTA_CURRENT_TICKET_ID env var.
+# Graceful no-op if KOTA_CURRENT_TICKET_ID is empty/unset.
 
 # ─── Parse all args, separating flags from positionals ───────────────────────
 ORIGIN=""
@@ -22,12 +23,12 @@ for arg in "$@"; do
   fi
 done
 
-TICKET_ID="${POSITIONALS[0]:-}"
+TICKET_ID="${KOTA_CURRENT_TICKET_ID:-}"
 if [[ -z "$TICKET_ID" ]]; then
   exit 0
 fi
 
-EVENT_NAME="${POSITIONALS[1]:?Usage: ollo emit [--origin=SOURCE] TICKET_ID EVENT_NAME [key=value...]}"
+EVENT_NAME="${POSITIONALS[0]:?Usage: ollo emit [--origin=SOURCE] EVENT_NAME [key=value...]}"
 
 # ─── Build JSON ──────────────────────────────────────────────────────────────
 TS="$(date -u +%Y-%m-%dT%H:%M:%SZ)"

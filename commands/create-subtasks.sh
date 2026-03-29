@@ -155,7 +155,7 @@ fi
 
 # Emit log event (only if subtasks were actually created)
 if [ "$CREATED_COUNT" -gt 0 ]; then
-  ollo emit "$ISSUE_ID" SubtasksCreated \
+  ollo emit SubtasksCreated \
     --origin=create-subtasks \
     created="$CREATED_COUNT" \
     failed="$FAILED_COUNT"
