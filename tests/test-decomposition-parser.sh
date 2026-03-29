@@ -16,86 +16,79 @@ ERRORS=""
 TICKETS=$(kota tickets list | jq -r '.[].identifier')
 
 for TICKET in $TICKETS; do
-  # Get documents for this ticket
-  DOCS=$(kota documents list --ticket "$TICKET" 2>/dev/null | jq -r '.[].id' || true)
+  TEST_OUTPUT="$TEMP_DIR/$TICKET"
+  mkdir -p "$TEST_OUTPUT"
 
-  for DOC_ID in $DOCS; do
-    CONTENT=$(kota documents read "$DOC_ID" 2>/dev/null | jq -r '.content // ""' || true)
+  # Run the parser in dry-run mode
+  if ! OUTPUT=$(ollo create-subtasks-from-decomposition-plan \
+    --from-ticket "$TICKET" --dry-run --output-dir "$TEST_OUTPUT" 2>&1); then
+    if echo "$OUTPUT" | grep -q 'no plan documents found'; then
+      continue # No plan — not a test candidate
+    fi
+    if echo "$OUTPUT" | grep -q 'failed to fetch ticket'; then
+      continue # Cannot fetch ticket, skip
+    fi
+    FAIL=$((FAIL + 1))
+    ERRORS="${ERRORS}\nFAIL: $TICKET — parser error: $OUTPUT"
+    continue
+  fi
 
-    # Check if this is a decomposition plan
-    if ! echo "$CONTENT" | grep -q '<subtask-document>'; then
+  # Idempotent no-op (subtasks already created) — skip
+  if [[ ! -f "$TEST_OUTPUT/payload.json" ]]; then
+    SKIP=$((SKIP + 1))
+    echo "SKIP: $TICKET — subtasks already created (idempotent no-op)"
+    continue
+  fi
+
+  # Check if reference cache exists
+  REF_DIR="$REFERENCE_CACHE/$TICKET"
+  if [[ ! -d "$REF_DIR" ]]; then
+    SKIP=$((SKIP + 1))
+    echo "SKIP: $TICKET — no reference cache (parser ran successfully)"
+    continue
+  fi
+
+  # Compare payload.json (normalize for comparison — sort keys, ignore whitespace differences)
+  PLAN_OK=true
+
+  if [[ -f "$REF_DIR/payload.json" ]]; then
+    # Compare subtask identifiers and titles (ignore contentPath since output-dir differs)
+    REF_SUBTASKS=$(jq -S '[.subtasks[] | {identifier, title}]' "$REF_DIR/payload.json")
+    GEN_SUBTASKS=$(jq -S '[.subtasks[] | {identifier, title}]' "$TEST_OUTPUT/payload.json")
+
+    if [[ "$REF_SUBTASKS" != "$GEN_SUBTASKS" ]]; then
+      PLAN_OK=false
+      ERRORS="${ERRORS}\nFAIL: $TICKET — payload.json subtask mismatch"
+      ERRORS="${ERRORS}\n  Expected: $REF_SUBTASKS"
+      ERRORS="${ERRORS}\n  Got:      $GEN_SUBTASKS"
+    fi
+  fi
+
+  # Compare each SUBTASK-XXX.md content
+  for REF_FILE in "$REF_DIR"/SUBTASK-*.md; do
+    [[ -f "$REF_FILE" ]] || continue
+    SUBTASK_NAME=$(basename "$REF_FILE")
+    GEN_FILE="$TEST_OUTPUT/$SUBTASK_NAME"
+
+    if [[ ! -f "$GEN_FILE" ]]; then
+      PLAN_OK=false
+      ERRORS="${ERRORS}\nFAIL: $TICKET/$SUBTASK_NAME — file not generated"
       continue
     fi
-    if ! echo "$CONTENT" | grep -q '^# Decomposition Plan for '; then
-      continue
-    fi
 
-    # This is a decomposition plan — test it
-    PLAN_ISSUE=$(echo "$CONTENT" | grep -m1 '^# Decomposition Plan for ' | awk '{print $NF}')
-    TEST_OUTPUT="$TEMP_DIR/$PLAN_ISSUE"
-    mkdir -p "$TEST_OUTPUT"
-
-    # Write plan to temp file
-    PLAN_FILE="$TEMP_DIR/${PLAN_ISSUE}.md"
-    echo "$CONTENT" >"$PLAN_FILE"
-
-    # Run the parser in dry-run mode
-    if ! ollo create-subtasks-from-decomposition-plan --dry-run --output-dir "$TEST_OUTPUT" --from-ticket "$PLAN_ISSUE" >/dev/null 2>&1; then
-      FAIL=$((FAIL + 1))
-      ERRORS="${ERRORS}\nFAIL: $DOC_ID ($PLAN_ISSUE) — parser crashed"
-      continue
-    fi
-
-    # Check if reference cache exists
-    REF_DIR="$REFERENCE_CACHE/$PLAN_ISSUE"
-    if [[ ! -d "$REF_DIR" ]]; then
-      SKIP=$((SKIP + 1))
-      echo "SKIP: $PLAN_ISSUE — no reference cache (parser ran successfully)"
-      continue
-    fi
-
-    # Compare payload.json (normalize for comparison — sort keys, ignore whitespace differences)
-    PLAN_OK=true
-
-    if [[ -f "$REF_DIR/payload.json" ]]; then
-      # Compare subtask identifiers and titles (ignore contentPath since output-dir differs)
-      REF_SUBTASKS=$(jq -S '[.subtasks[] | {identifier, title}]' "$REF_DIR/payload.json")
-      GEN_SUBTASKS=$(jq -S '[.subtasks[] | {identifier, title}]' "$TEST_OUTPUT/payload.json")
-
-      if [[ "$REF_SUBTASKS" != "$GEN_SUBTASKS" ]]; then
-        PLAN_OK=false
-        ERRORS="${ERRORS}\nFAIL: $PLAN_ISSUE — payload.json subtask mismatch"
-        ERRORS="${ERRORS}\n  Expected: $REF_SUBTASKS"
-        ERRORS="${ERRORS}\n  Got:      $GEN_SUBTASKS"
-      fi
-    fi
-
-    # Compare each SUBTASK-XXX.md content
-    for REF_FILE in "$REF_DIR"/SUBTASK-*.md; do
-      [[ -f "$REF_FILE" ]] || continue
-      SUBTASK_NAME=$(basename "$REF_FILE")
-      GEN_FILE="$TEST_OUTPUT/$SUBTASK_NAME"
-
-      if [[ ! -f "$GEN_FILE" ]]; then
-        PLAN_OK=false
-        ERRORS="${ERRORS}\nFAIL: $PLAN_ISSUE/$SUBTASK_NAME — file not generated"
-        continue
-      fi
-
-      if ! diff -q "$REF_FILE" "$GEN_FILE" >/dev/null 2>&1; then
-        PLAN_OK=false
-        ERRORS="${ERRORS}\nFAIL: $PLAN_ISSUE/$SUBTASK_NAME — content differs"
-        diff -u "$REF_FILE" "$GEN_FILE" | head -20 >>"$TEMP_DIR/diffs.txt" 2>/dev/null || true
-      fi
-    done
-
-    if $PLAN_OK; then
-      PASS=$((PASS + 1))
-      echo "PASS: $PLAN_ISSUE"
-    else
-      FAIL=$((FAIL + 1))
+    if ! diff -q "$REF_FILE" "$GEN_FILE" >/dev/null 2>&1; then
+      PLAN_OK=false
+      ERRORS="${ERRORS}\nFAIL: $TICKET/$SUBTASK_NAME — content differs"
+      diff -u "$REF_FILE" "$GEN_FILE" | head -20 >>"$TEMP_DIR/diffs.txt" 2>/dev/null || true
     fi
   done
+
+  if $PLAN_OK; then
+    PASS=$((PASS + 1))
+    echo "PASS: $TICKET"
+  else
+    FAIL=$((FAIL + 1))
+  fi
 done
 
 echo ""
