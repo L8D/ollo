@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
+source "${OLLO_HOME:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}/lib/hook-debug.sh"
 
 # Skip if no ticket ID configured
 if [ -z "${KOTA_CURRENT_TICKET_ID:-}" ]; then

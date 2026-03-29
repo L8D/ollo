@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
 set -euo pipefail
+source "${OLLO_HOME:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}/lib/hook-debug.sh"
 
 # ─── Usage ───────────────────────────────────────────────────────────────────
 # ollo emit-hook-event <HOOK_TYPE>

@@ -6,6 +6,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 OLLO_HOME="${OLLO_HOME:-"$(cd "$SCRIPT_DIR/.." && pwd)"}"
+source "$OLLO_HOME/lib/hook-debug.sh"
 
 # Detect mode: ralph uses --settings (sets RALPH_SETTINGS env var), interactive uses OLLO_PERMISSION_PROMPT
 IS_RALPH="${RALPH_SETTINGS:+1}"
@@ -339,7 +340,7 @@ check_bash_command_denied() {
 # Check deny FIRST (deny takes precedence)
 if check_permission_array "$permission_key" "permissions.deny"; then
   # Explicitly denied by key
-  printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Permission denied by ralph settings"}}\n'
+  hook_log_stdout '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Permission denied by ralph settings"}}'
   exit 0
 fi
 
@@ -347,7 +348,7 @@ fi
 if [[ "$tool_name" == "Bash" ]]; then
   bash_command=$(get_bash_command "$tool_input")
   if check_bash_command_denied "$bash_command"; then
-    printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Command matches deny pattern"}}\n'
+    hook_log_stdout '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Command matches deny pattern"}}'
     exit 0
   fi
 fi
@@ -360,7 +361,7 @@ INTERACTIVE_AUTO_APPROVE_TOOLS=(Agent Task ExitPlanMode)
 if [[ -z "$IS_RALPH" ]]; then
   for _tool in "${INTERACTIVE_AUTO_APPROVE_TOOLS[@]}"; do
     if [[ "$tool_name" == "$_tool" ]]; then
-      printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"allow"}}\n'
+      hook_log_stdout '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"allow"}}'
       exit 0
     fi
   done
@@ -369,7 +370,7 @@ fi
 # Check if already allowed
 if check_permission_array "$permission_key" "permissions.allow"; then
   # Already allowed, return allow decision
-  printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"allow"}}\n'
+  hook_log_stdout '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"allow"}}'
   exit 0
 fi
 
@@ -380,7 +381,7 @@ fi
 # without a timeout so the dialog has time to be answered.
 has_timeout=$(echo "$tool_input" | jq 'has("timeout")')
 if [[ "$has_timeout" == "true" ]]; then
-  printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Tool was invoked with a timeout parameter, which may expire while waiting for permission approval. Retry this exact same tool call without the timeout parameter."}}\n'
+  hook_log_stdout '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Tool was invoked with a timeout parameter, which may expire while waiting for permission approval. Retry this exact same tool call without the timeout parameter."}}'
   exit 0
 fi
 
@@ -445,14 +446,14 @@ choose from list $dialog_options with prompt "$escaped_description" with title "
 APPLESCRIPT
 ) || {
   # Dialog was cancelled - deny by default
-  printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Permission dialog cancelled"}}\n'
+  hook_log_stdout '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Permission dialog cancelled"}}'
   exit 0
 }
 
 # Parse response ("false" means user clicked Cancel)
 case "$response" in
   "Allow once")
-    printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"allow"}}\n'
+    hook_log_stdout '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"allow"}}'
     ;;
   "Always allow")
     persist_keys="${new_keys:-$permission_key}"
@@ -460,10 +461,10 @@ case "$response" in
       [[ -z "$k" ]] && continue
       add_permission "$k" "permissions.allow"
     done <<<"$persist_keys"
-    printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"allow"}}\n'
+    hook_log_stdout '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"allow"}}'
     ;;
   "Deny once")
-    printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Permission denied by user (once)"}}\n'
+    hook_log_stdout '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Permission denied by user (once)"}}'
     ;;
   "Always deny")
     persist_keys="${new_keys:-$permission_key}"
@@ -471,11 +472,11 @@ case "$response" in
       [[ -z "$k" ]] && continue
       add_permission "$k" "permissions.deny"
     done <<<"$persist_keys"
-    printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Permission denied by user (always)"}}\n'
+    hook_log_stdout '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Permission denied by user (always)"}}'
     ;;
   "Fallback to built-in")
     # Output empty JSON — no permissionDecision — so Claude Code's native prompt takes over
-    printf '{}\n'
+    hook_log_stdout '{}'
     ;;
   "Provide correction")
     # Walk up the process tree to find the ralph.sh ancestor and send SIGQUIT
@@ -489,11 +490,11 @@ case "$response" in
       fi
     done
     # Deny the tool call — ralph's soft-interrupt handler takes over from here
-    printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"User chose to provide a correction"}}\n'
+    hook_log_stdout '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"User chose to provide a correction"}}'
     ;;
   *)
     # Cancel or unexpected response - deny by default
-    printf '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Permission dialog cancelled or unrecognized response"}}\n'
+    hook_log_stdout '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Permission dialog cancelled or unrecognized response"}}'
     ;;
 esac
 
