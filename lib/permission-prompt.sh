@@ -357,7 +357,7 @@ fi
 # These tools don't modify files or run commands, so they are safe to allow
 # without prompting. This list is intentionally NOT in settings.local.json
 # because that would also auto-approve them for ralph sessions.
-INTERACTIVE_AUTO_APPROVE_TOOLS=(Agent Task ExitPlanMode)
+INTERACTIVE_AUTO_APPROVE_TOOLS=(Agent Task ExitPlanMode AskUserQuestion)
 if [[ "$OLLO_MODE" != "ralph" ]]; then
   for _tool in "${INTERACTIVE_AUTO_APPROVE_TOOLS[@]}"; do
     if [[ "$tool_name" == "$_tool" ]]; then
