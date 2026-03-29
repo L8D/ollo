@@ -330,6 +330,8 @@ main() {
     fi
   fi
 
+  export KOTA_CURRENT_TICKET_ID="$issue_id"
+
   log "$CYAN" "Ralph Stream starting..."
   [[ "$continue_mode" == "true" ]] && log "$CYAN" "Continue mode enabled for first iteration"
 

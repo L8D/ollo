@@ -8,7 +8,7 @@ Break down a plan into BDD Scenarios using a red/green workflow. Each subtask = 
 **First, run this command** (no output expected):
 
 ```bash
-ollo emit "$KOTA_CURRENT_TICKET_ID" SkillInvoked --origin=skill skill="decompose-red-green"
+ollo emit SkillInvoked --origin=skill skill="decompose-red-green"
 ```
 
 **Why always decompose?** Decomposition is not just an organizational tool — it is the interface between planning and execution. The agent orchestrator (`ollo ralph`) reads Kota subtask documents to dispatch work to separate Claude sessions. Without decomposed subtasks in the expected format, `ralph` has nothing to execute. Always perform the full decomposition, regardless of task size or complexity.
