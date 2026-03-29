@@ -167,6 +167,16 @@ kota documents create \
           fi
           MESSAGE=$(echo "$line" | jq -r '.message // ""')
 
+          # Skip messages that are purely ollo:decompose or ollo:decompose-red-green command invocations
+          STRIPPED_MSG="$MESSAGE"
+          STRIPPED_MSG=$(echo "$STRIPPED_MSG" | sed 's/<command-message>ollo:decompose\(-red-green\)\{0,1\}<\/command-message>//g')
+          STRIPPED_MSG=$(echo "$STRIPPED_MSG" | sed 's/<command-name>\/ollo:decompose\(-red-green\)\{0,1\}<\/command-name>//g')
+          STRIPPED_MSG=$(echo "$STRIPPED_MSG" | sed 's/<command-args><\/command-args>//g')
+          STRIPPED_MSG=$(echo "$STRIPPED_MSG" | tr -d '[:space:]')
+          if [ -z "$STRIPPED_MSG" ]; then
+            continue
+          fi
+
           echo "> <!-- uuid:$UUID --> *${DISPLAY_TS}*"
 
           # Format multi-line user messages with blockquote prefix
