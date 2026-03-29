@@ -10,10 +10,9 @@ fi
 PROJECT_DIR="$(pwd)"
 SESSION_ID_FILE="$PROJECT_DIR/.claude/ralph-session-id"
 
-# Generate temp settings file with resolved hook path
-RALPH_SETTINGS=$(mktemp)
-sed "s|__OLLO_PERMISSION_PROMPT__|$OLLO_HOME/lib/permission-prompt.sh|g" \
-  "$OLLO_HOME/lib/settings.json" >"$RALPH_SETTINGS"
+# Set env vars for ralph mode (permission-prompt.sh reads OLLO_MODE, crier reads CRIER_ENABLED)
+export OLLO_MODE=ralph
+export CRIER_ENABLED=false
 
 DIM='\033[2m'
 RESET='\033[0m'
@@ -25,10 +24,6 @@ CYAN='\033[36m'
 # Exit notification state
 EXIT_STATUS="failure"
 EXIT_MESSAGE=""
-
-cleanup_temp_settings() {
-  rm -f "$RALPH_SETTINGS"
-}
 
 send_slack_notification() {
   crier
@@ -77,7 +72,6 @@ handle_interrupt() {
 }
 
 cleanup_all() {
-  cleanup_temp_settings
   send_slack_notification
 }
 trap cleanup_all EXIT
@@ -401,9 +395,9 @@ ${doc_content}
         exit 1
       fi
       log "$CYAN" "Using --resume $resume_session_id for first iteration"
-      (claude --settings "$RALPH_SETTINGS" --permission-mode acceptEdits --output-format stream-json --verbose --name "$session_name" --resume "$resume_session_id" -p "${RALPH_CONTINUE_MSG:-continue}" 2>&1 | parse_streaming_json) &
+      (claude --permission-mode acceptEdits --output-format stream-json --verbose --name "$session_name" --resume "$resume_session_id" -p "${RALPH_CONTINUE_MSG:-continue}" 2>&1 | parse_streaming_json) &
     else
-      (claude --settings "$RALPH_SETTINGS" --permission-mode acceptEdits --output-format stream-json --verbose --name "$session_name" -p "$prompt" 2>&1 | parse_streaming_json) &
+      (claude --permission-mode acceptEdits --output-format stream-json --verbose --name "$session_name" -p "$prompt" 2>&1 | parse_streaming_json) &
     fi
     PIPELINE_PID=$!
     wait $PIPELINE_PID 2>/dev/null
@@ -441,7 +435,7 @@ ${doc_content}
 
         # Run Claude with --resume and user's message
         set +e
-        (claude --settings "$RALPH_SETTINGS" \
+        (claude \
           --permission-mode acceptEdits \
           --output-format stream-json \
           --verbose \
