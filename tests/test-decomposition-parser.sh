@@ -40,7 +40,7 @@ for TICKET in $TICKETS; do
     echo "$CONTENT" >"$PLAN_FILE"
 
     # Run the parser in dry-run mode
-    if ! ollo create-subtasks-from-decomposition-plan --dry-run --output-dir "$TEST_OUTPUT" "$PLAN_FILE" >/dev/null 2>&1; then
+    if ! ollo create-subtasks-from-decomposition-plan --dry-run --output-dir "$TEST_OUTPUT" --from-ticket "$PLAN_ISSUE" >/dev/null 2>&1; then
       FAIL=$((FAIL + 1))
       ERRORS="${ERRORS}\nFAIL: $DOC_ID ($PLAN_ISSUE) — parser crashed"
       continue

@@ -1,13 +1,11 @@
 #!/usr/bin/env bash
 # Parse a decomposition plan and create subtasks via ollo create-subtasks
-# Usage: ollo create-subtasks-from-decomposition-plan [OPTIONS] [FILE]
+# Usage: ollo create-subtasks-from-decomposition-plan --from-ticket TICKET_ID [OPTIONS]
 #
 # Options:
-#   --from-ticket TICKET_ID   Fetch latest plan from Kota ticket
-#   --output-dir DIR     Write files to DIR instead of cache/{ISSUE_ID}/
-#   --dry-run            Parse and write cache files but skip ollo create-subtasks
-#
-# Input: file path, --from-ticket, or stdin
+#   --from-ticket TICKET_ID   Fetch latest plan from Kota ticket (required)
+#   --output-dir DIR          Write files to DIR instead of cache/{ISSUE_ID}/
+#   --dry-run                 Parse and write cache files but skip ollo create-subtasks
 set -euo pipefail
 
 if [[ -z "${OLLO_HOME:-}" ]]; then
@@ -18,7 +16,6 @@ fi
 DRY_RUN=false
 FROM_TICKET=""
 OUTPUT_DIR=""
-FILE_PATH=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -39,55 +36,42 @@ while [[ $# -gt 0 ]]; do
       exit 1
       ;;
     *)
-      FILE_PATH="$1"
-      shift
+      echo "error: unexpected argument: $1" >&2
+      exit 1
       ;;
   esac
 done
+
+if [[ -z "$FROM_TICKET" ]]; then
+  echo "error: --from-ticket TICKET_ID is required" >&2
+  exit 1
+fi
 
 TEMP_PLAN=""
 cleanup() { [[ -n "$TEMP_PLAN" ]] && rm -f "$TEMP_PLAN" || true; }
 trap cleanup EXIT
 
-if [[ -n "$FROM_TICKET" ]]; then
-  TICKET_JSON=$(kota tickets read "$FROM_TICKET" 2>/dev/null) || {
-    echo "error: failed to fetch ticket $FROM_TICKET" >&2
-    exit 1
-  }
+TICKET_JSON=$(kota tickets read "$FROM_TICKET" 2>/dev/null) || {
+  echo "error: failed to fetch ticket $FROM_TICKET" >&2
+  exit 1
+}
 
-  DOC_ID=$(echo "$TICKET_JSON" | jq -r '
-    [.documents[] | select(.title | startswith("PLAN "))]
-    | sort_by(.updatedAt) | reverse
-    | .[0].id // empty
-  ')
+DOC_ID=$(echo "$TICKET_JSON" | jq -r '
+  [.documents[] | select(.title | startswith("PLAN "))]
+  | sort_by(.updatedAt) | reverse
+  | .[0].id // empty
+')
 
-  if [[ -z "$DOC_ID" ]]; then
-    echo "error: no plan documents found in ticket $FROM_TICKET" >&2
-    exit 1
-  fi
-
-  TEMP_PLAN=$(mktemp)
-  kota documents read "$DOC_ID" | jq -r '.content' >"$TEMP_PLAN"
-  PLAN_FILE="$TEMP_PLAN"
-elif [[ -n "$FILE_PATH" ]]; then
-  if [[ ! -f "$FILE_PATH" ]]; then
-    echo "error: file not found: $FILE_PATH" >&2
-    exit 1
-  fi
-  PLAN_FILE="$FILE_PATH"
-else
-  # stdin
-  TEMP_PLAN=$(mktemp)
-  cat >"$TEMP_PLAN"
-  PLAN_FILE="$TEMP_PLAN"
-fi
-
-ISSUE_ID=$(grep -m1 '^# Decomposition Plan for ' "$PLAN_FILE" | awk '{print $NF}')
-if [[ -z "$ISSUE_ID" ]]; then
-  echo "error: could not extract issue ID from plan header" >&2
-  echo "Expected first H1 to match: # Decomposition Plan for TICKET-ID" >&2
+if [[ -z "$DOC_ID" ]]; then
+  echo "error: no plan documents found in ticket $FROM_TICKET" >&2
   exit 1
 fi
+
+TEMP_PLAN=$(mktemp)
+kota documents read "$DOC_ID" | jq -r '.content' >"$TEMP_PLAN"
+PLAN_FILE="$TEMP_PLAN"
+
+ISSUE_ID="$FROM_TICKET"
 
 if [[ -z "$OUTPUT_DIR" ]]; then
   OUTPUT_DIR="cache/${ISSUE_ID}"
@@ -138,8 +122,8 @@ if [[ "$SUBTASK_COUNT" -eq 0 ]]; then
   exit 1
 fi
 
-# --- Idempotency check (only when --from-ticket is used) ---
-if [[ -n "$FROM_TICKET" ]]; then
+# --- Idempotency check ---
+if [[ "$DRY_RUN" != "true" ]]; then
   # Subtask identifiers from the plan
   PLAN_SUBTASKS=$(cut -f1 "$MANIFEST" | sort)
 
