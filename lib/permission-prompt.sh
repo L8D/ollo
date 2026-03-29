@@ -8,9 +8,9 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 OLLO_HOME="${OLLO_HOME:-"$(cd "$SCRIPT_DIR/.." && pwd)"}"
 source "$OLLO_HOME/lib/hook-debug.sh"
 
-# Detect mode: ralph uses --settings (sets RALPH_SETTINGS env var), interactive uses OLLO_PERMISSION_PROMPT
-IS_RALPH="${RALPH_SETTINGS:+1}"
-if [[ -z "$IS_RALPH" && "${OLLO_PERMISSION_PROMPT:-}" != "1" ]]; then
+# Detect mode: ralph exports OLLO_MODE=ralph, interactive opts in via OLLO_PERMISSION_PROMPT_ENABLED=true
+OLLO_MODE="${OLLO_MODE:-interactive}"
+if [[ "$OLLO_MODE" != "ralph" && "${OLLO_PERMISSION_PROMPT_ENABLED:-}" != "true" ]]; then
   exit 0
 fi
 
@@ -27,7 +27,7 @@ input=$(cat)
 hook_cwd=$(echo "$input" | jq -r '.cwd // ""')
 SETTINGS_FILE="${CLAUDE_PROJECT_DIR:-${hook_cwd:-.}}/.claude/settings.local.json"
 [[ -L "$SETTINGS_FILE" ]] && SETTINGS_FILE="$(readlink -f "$SETTINGS_FILE")"
-[[ -n "${RALPH_DEBUG:-}" ]] && echo "DEBUG: SETTINGS_FILE=$SETTINGS_FILE exists=$(test -f "$SETTINGS_FILE" && echo yes || echo no)" >&2
+[[ -n "${RALPH_DEBUG:-}" ]] && echo "DEBUG: OLLO_MODE=$OLLO_MODE SETTINGS_FILE=$SETTINGS_FILE exists=$(test -f "$SETTINGS_FILE" && echo yes || echo no)" >&2
 
 # Extract tool information
 tool_name=$(echo "$input" | jq -r '.tool_name')
@@ -358,7 +358,7 @@ fi
 # without prompting. This list is intentionally NOT in settings.local.json
 # because that would also auto-approve them for ralph sessions.
 INTERACTIVE_AUTO_APPROVE_TOOLS=(Agent Task ExitPlanMode)
-if [[ -z "$IS_RALPH" ]]; then
+if [[ "$OLLO_MODE" != "ralph" ]]; then
   for _tool in "${INTERACTIVE_AUTO_APPROVE_TOOLS[@]}"; do
     if [[ "$tool_name" == "$_tool" ]]; then
       hook_log_stdout '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"allow"}}'
@@ -432,7 +432,7 @@ fi
 escaped_description=$(printf '%s' "$tool_description" | sed 's/\\/\\\\/g; s/"/\\"/g')
 
 # Build dialog options based on mode
-if [[ -n "$IS_RALPH" ]]; then
+if [[ "$OLLO_MODE" == "ralph" ]]; then
   dialog_options='{"Allow once", "Always allow", "Deny once", "Always deny", "Provide correction"}'
   dialog_title="Ralph Permission: $tool_name"
 else
