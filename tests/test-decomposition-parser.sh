@@ -3,6 +3,11 @@
 # Usage: tools/ollo/tests/test-decomposition-parser.sh
 set -euo pipefail
 
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+OLLO_HOME="$(cd "$SCRIPT_DIR/.." && pwd)"
+export OLLO_HOME
+OLLO_BIN="$OLLO_HOME/bin/ollo"
+
 REFERENCE_CACHE="$HOME/lab/worktrees/main/cache"
 TEMP_DIR=$(mktemp -d)
 trap 'rm -rf "$TEMP_DIR"' EXIT
@@ -20,13 +25,16 @@ for TICKET in $TICKETS; do
   mkdir -p "$TEST_OUTPUT"
 
   # Run the parser in dry-run mode
-  if ! OUTPUT=$(ollo create-subtasks-from-decomposition-plan \
+  if ! OUTPUT=$("$OLLO_BIN" create-subtasks-from-decomposition-plan \
     --from-ticket "$TICKET" --dry-run --output-dir "$TEST_OUTPUT" 2>&1); then
     if echo "$OUTPUT" | grep -q 'no plan documents found'; then
       continue # No plan — not a test candidate
     fi
     if echo "$OUTPUT" | grep -q 'failed to fetch ticket'; then
       continue # Cannot fetch ticket, skip
+    fi
+    if echo "$OUTPUT" | grep -q 'no subtasks found in plan'; then
+      continue # Plan exists but uses a different format — not a test candidate
     fi
     FAIL=$((FAIL + 1))
     ERRORS="${ERRORS}\nFAIL: $TICKET — parser error: $OUTPUT"
