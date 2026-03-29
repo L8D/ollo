@@ -20,6 +20,7 @@ import (
 	"io"
 	"os"
 	"strings"
+	"unicode"
 
 	"mvdan.cc/sh/v3/syntax"
 )
@@ -28,9 +29,11 @@ import (
 // Key formatting — mirrors the bash hook's permission_key_for_single_command
 // ---------------------------------------------------------------------------
 
-// effectiveArgv returns the logical (argv0, argv1) of a simple command,
+// effectiveArgv returns the logical (argv0, argv1, argv2) of a simple command,
 // unwrapping common transparent prefixes like env, sudo, time, nice, etc.
-func effectiveArgv(args []string) (string, string) {
+// argv2 is included only when both argv1 and argv2 start with a letter
+// (subcommand pattern like "kota tickets read", "docker compose up").
+func effectiveArgv(args []string) (string, string, string) {
 	transparentPrefixes := map[string]bool{
 		"env": true, "sudo": true, "time": true, "nice": true,
 		"nohup": true, "xargs": true, "exec": true, "builtin": true,
@@ -66,15 +69,19 @@ func effectiveArgv(args []string) (string, string) {
 
 	if i >= len(args) {
 		if len(args) == 0 {
-			return "", ""
+			return "", "", ""
 		}
-		return args[0], ""
+		return args[0], "", ""
 	}
 
 	argv0 := args[i]
 	argv1 := ""
 	if i+1 < len(args) {
 		argv1 = args[i+1]
+	}
+	argv2 := ""
+	if i+2 < len(args) {
+		argv2 = args[i+2]
 	}
 
 	// Git: skip global flags to find the real subcommand
@@ -103,20 +110,32 @@ func effectiveArgv(args []string) (string, string) {
 		} else {
 			argv1 = ""
 		}
+		// Git is well-captured at 2-depth; don't include argv2
+		argv2 = ""
 	}
 
-	return argv0, argv1
+	// Include argv2 only when both argv1 and argv2 start with a letter
+	// (subcommand pattern like "kota tickets read", "docker compose up")
+	if argv2 != "" {
+		if len(argv1) == 0 || !unicode.IsLetter(rune(argv1[0])) ||
+			!unicode.IsLetter(rune(argv2[0])) {
+			argv2 = ""
+		}
+	}
+
+	return argv0, argv1, argv2
 }
 
-func formatKey(argv0, argv1 string) string {
+func formatKey(argv0, argv1, argv2 string) string {
 	argv0 = strings.TrimSpace(argv0)
 	argv1 = strings.TrimSpace(argv1)
+	argv2 = strings.TrimSpace(argv2)
 	if argv0 == "" {
 		return ""
 	}
-	// Strip any leading path components (e.g. /usr/bin/git → git)
-	// but only for the key, to match how the bash hook stores permissions.
-	// Actually: keep the full token so that ./script and script stay distinct.
+	if argv1 != "" && argv2 != "" {
+		return fmt.Sprintf("Bash(%s %s %s:*)", argv0, argv1, argv2)
+	}
 	if argv1 != "" {
 		return fmt.Sprintf("Bash(%s %s:*)", argv0, argv1)
 	}
@@ -193,7 +212,7 @@ func collectKeys(node syntax.Node, keys *[]string) {
 			args = append(args, wordLiteral(w))
 		}
 
-		argv0, argv1 := effectiveArgv(args)
+		argv0, argv1, argv2 := effectiveArgv(args)
 
 		// If argv1 is still empty, check for a heredoc redirect on the parent
 		// Stmt and use its operator as argv1 (e.g. <<EOF).
@@ -231,8 +250,8 @@ func collectKeys(node syntax.Node, keys *[]string) {
 						execArgs = append(execArgs, w)
 					}
 					if len(execArgs) > 0 {
-						ea0, ea1 := effectiveArgv(execArgs)
-						key = formatKey(ea0, ea1)
+						ea0, ea1, ea2 := effectiveArgv(execArgs)
+						key = formatKey(ea0, ea1, ea2)
 					}
 					break // only handle first -exec
 				}
@@ -242,11 +261,11 @@ func collectKeys(node syntax.Node, keys *[]string) {
 			}
 			if !foundExec && !foundUnsafe {
 				// Safe, read-only find — emit find__safe
-				key = formatKey("find__safe", argv1)
+				key = formatKey("find__safe", argv1, "")
 			}
 		}
 		if key == "" {
-			key = formatKey(argv0, argv1)
+			key = formatKey(argv0, argv1, argv2)
 		}
 		if key != "" {
 			*keys = append(*keys, key)
@@ -297,6 +316,11 @@ func fallbackKey(src string) string {
 	}
 	if len(fields) == 1 {
 		return fmt.Sprintf("Bash(%s:*)", fields[0])
+	}
+	if len(fields) >= 3 &&
+		len(fields[1]) > 0 && unicode.IsLetter(rune(fields[1][0])) &&
+		len(fields[2]) > 0 && unicode.IsLetter(rune(fields[2][0])) {
+		return fmt.Sprintf("Bash(%s %s %s:*)", fields[0], fields[1], fields[2])
 	}
 	return fmt.Sprintf("Bash(%s %s:*)", fields[0], fields[1])
 }
@@ -410,6 +434,37 @@ var tests = []testCase{
 		// -ok is unsafe: keep as find
 		`find . -type f -ok rm {} \;`,
 		[]string{"Bash(find .:*)"},
+	},
+	// 3-depth subcommand patterns (the bug this fixes)
+	{
+		"kota tickets read SNWLLY-160",
+		[]string{"Bash(kota tickets read:*)"},
+	},
+	{
+		"kota documents read doc-123",
+		[]string{"Bash(kota documents read:*)"},
+	},
+	{
+		"docker compose up -d",
+		[]string{"Bash(docker compose up:*)"},
+	},
+	{
+		"kubectl get pods -n kube-system",
+		[]string{"Bash(kubectl get pods:*)"},
+	},
+	{
+		"npm run build",
+		[]string{"Bash(npm run build:*)"},
+	},
+	// Negative: argv2 is a flag — should NOT be included
+	{
+		"cargo test --release",
+		[]string{"Bash(cargo test:*)"},
+	},
+	// Negative: argv1 is numeric — should NOT be included
+	{
+		"chmod 644 file.txt",
+		[]string{"Bash(chmod 644:*)"},
 	},
 }
 

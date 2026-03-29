@@ -40,12 +40,15 @@ permission_key_for_single_command() {
     printf '%s' "$cmd" | "$BASH_SPLIT" | head -n1
     return
   fi
-  # Fallback: original awk heuristic
+  # Fallback: awk heuristic (extended to 3 tokens for subcommand CLIs)
   cmd=$(printf '%s' "$cmd" | tr '\n' ' ' | sed 's/\\  */ /g; s/^[[:space:]]*//')
-  local first_word second_word
+  local first_word second_word third_word
   first_word=$(printf '%s' "$cmd" | awk '{print $1}')
   second_word=$(printf '%s' "$cmd" | awk '{print $2}')
-  if [[ -n "$second_word" ]]; then
+  third_word=$(printf '%s' "$cmd" | awk '{print $3}')
+  if [[ -n "$third_word" && "$second_word" =~ ^[a-zA-Z] && "$third_word" =~ ^[a-zA-Z] ]]; then
+    echo "Bash($first_word $second_word $third_word:*)"
+  elif [[ -n "$second_word" ]]; then
     echo "Bash($first_word $second_word:*)"
   else
     echo "Bash($first_word:*)"
