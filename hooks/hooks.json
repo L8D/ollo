@@ -38,7 +38,7 @@
         "hooks": [
           {
             "type": "command",
-            "command": "$OLLO_HOME/lib/permission-prompt.sh",
+            "command": "ollo permission-prompt",
             "timeout": 120
           }
         ]
