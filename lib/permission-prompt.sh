@@ -236,25 +236,43 @@ check_permission_array() {
   local sub_commands
   sub_commands=$(split_compound_command "$command")
 
+  # Also get raw sub-commands for exact-key matching
+  local raw_subs
+  raw_subs=$(printf '%s' "$command" | awk -v RS='(&&|\\|\\||;|\\|)' '{
+    gsub(/^[[:space:]]+|[[:space:]]+$/, "")
+    if (length($0) > 0) print
+  }')
+
   # If there are no sub-commands (shouldn't happen), fall back to single key check
   if [[ -z "$sub_commands" ]]; then
     check_single_key_against_array "$key" "$array"
     return $?
   fi
 
-  # Every sub-command must match a pattern in the array
-  while IFS= read -r sub_cmd; do
+  # Zip bash-split keys with raw sub-commands
+  local -a key_arr raw_arr
+  mapfile -t key_arr <<<"$sub_commands"
+  mapfile -t raw_arr <<<"$raw_subs"
+
+  # Every sub-command must match (wildcard key OR exact key)
+  for idx in "${!key_arr[@]}"; do
+    local sub_cmd="${key_arr[$idx]}"
     [[ -z "$sub_cmd" ]] && continue
     local sub_key
     if [[ "$sub_cmd" == Bash\(* ]]; then
-      sub_key="$sub_cmd" # already a formatted key from bash-split
+      sub_key="$sub_cmd"
     else
       sub_key=$(permission_key_for_single_command "$sub_cmd")
     fi
     if ! check_single_key_against_array "$sub_key" "$array"; then
-      return 1
+      # Wildcard key didn't match — try exact key from raw command text
+      local raw="${raw_arr[$idx]:-}"
+      raw=$(printf '%s' "$raw" | sed 's/^[[:space:]]*//;s/[[:space:]]*$//')
+      if [[ -z "$raw" ]] || ! check_single_key_against_array "Bash($raw)" "$array"; then
+        return 1
+      fi
     fi
-  done <<<"$sub_commands"
+  done
 
   return 0
 }
