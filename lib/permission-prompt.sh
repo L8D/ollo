@@ -435,14 +435,21 @@ while IFS= read -r k; do
   fi
 done <<<"$all_sub_keys"
 
+# Compute exact key for "Always allow exact" display
+if [[ "$tool_name" == "Bash" ]]; then
+  exact_key="Bash($bash_cmd)"
+else
+  exact_key="$permission_key"
+fi
+
 # Append to description
 if [[ -n "$new_keys" ]]; then
   key_count=$(echo "$new_keys" | grep -c .)
   if [[ "$key_count" -eq 1 ]]; then
-    tool_description=$(printf '%s\n\nAlways allow/deny will apply to: %s' "$tool_description" "$new_keys")
+    tool_description=$(printf '%s\n\nAlways allow will apply to: %s\nAlways allow exact will apply to: %s' "$tool_description" "$new_keys" "$exact_key")
   else
     formatted_keys=$(echo "$new_keys" | sed 's/^/• /')
-    tool_description=$(printf '%s\n\nAlways allow/deny will apply to:\n%s' "$tool_description" "$formatted_keys")
+    tool_description=$(printf '%s\n\nAlways allow will apply to:\n%s\nAlways allow exact will apply to: %s' "$tool_description" "$formatted_keys" "$exact_key")
   fi
 fi
 
@@ -451,10 +458,10 @@ escaped_description=$(printf '%s' "$tool_description" | sed 's/\\/\\\\/g; s/"/\\
 
 # Build dialog options based on mode
 if [[ "$OLLO_MODE" == "ralph" ]]; then
-  dialog_options='{"Allow once", "Always allow", "Deny once", "Always deny", "Provide correction"}'
+  dialog_options='{"Allow once", "Always allow", "Always allow exact", "Deny once", "Always deny", "Provide correction"}'
   dialog_title="Ralph Permission: $tool_name"
 else
-  dialog_options='{"Allow once", "Always allow", "Deny once", "Always deny", "Fallback to built-in"}'
+  dialog_options='{"Allow once", "Always allow", "Always allow exact", "Deny once", "Always deny", "Fallback to built-in"}'
   dialog_title="Permission: $tool_name"
 fi
 
@@ -479,6 +486,14 @@ case "$response" in
       [[ -z "$k" ]] && continue
       add_permission "$k" "permissions.allow"
     done <<<"$persist_keys"
+    hook_log_stdout '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"allow"}}'
+    ;;
+  "Always allow exact")
+    if [[ "$tool_name" == "Bash" ]]; then
+      add_permission "Bash($bash_cmd)" "permissions.allow"
+    else
+      add_permission "$permission_key" "permissions.allow"
+    fi
     hook_log_stdout '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"allow"}}'
     ;;
   "Deny once")
