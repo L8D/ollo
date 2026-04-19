@@ -72,9 +72,23 @@ fi
 # ─── Step 3E: Read description and skip if prompt content is redundant ──────
 CURRENT_DESC=$(kota tickets read "$KOTA_CURRENT_TICKET_ID" 2>/dev/null | jq -r '.description // ""' || true)
 
+# Normalize text for deduplication by stripping all image references.
+# This ensures that prompts with rewritten @-prefixed image paths still
+# deduplicate against descriptions with bare filenames or URLs.
+strip_image_refs() {
+  sed -E \
+    -e 's#!\[[^]]*\]\([^)]*\)##g' \
+    -e 's#[[:space:]]*@[^ ]*\.(png|jpg|jpeg|gif|svg|webp)[[:space:]]*##gi' \
+    -e 's#\* *`[^`]*\.(png|jpg|jpeg|gif|svg|webp)`[^*]*##gi' \
+    -e 's#https?://[^ ]*\.(png|jpg|jpeg|gif|svg|webp)[^ ]*##gi'
+}
+
 if [ -n "$CURRENT_DESC" ]; then
-  # Check (a): cleaned prompt appears verbatim in description
-  if printf '%s' "$CURRENT_DESC" | grep -qF "$CLEANED"; then
+  NORM_DESC=$(printf '%s' "$CURRENT_DESC" | strip_image_refs)
+  NORM_CLEANED=$(printf '%s' "$CLEANED" | strip_image_refs)
+
+  # Check (a): cleaned prompt appears verbatim in description (after normalization)
+  if printf '%s' "$NORM_DESC" | grep -qF "$NORM_CLEANED"; then
     ollo emit TicketDescriptionUpdated --origin=sync-description
     exit 0
   fi
@@ -92,7 +106,9 @@ if [ -n "$CURRENT_DESC" ]; then
   done <<<"$CLEANED"
   CLEANED_BQ="${CLEANED_BQ:1}"
 
-  if printf '%s' "$CURRENT_DESC" | grep -qF "$CLEANED_BQ"; then
+  NORM_CLEANED_BQ=$(printf '%s' "$CLEANED_BQ" | strip_image_refs)
+
+  if printf '%s' "$NORM_DESC" | grep -qF "$NORM_CLEANED_BQ"; then
     ollo emit TicketDescriptionUpdated --origin=sync-description
     exit 0
   fi
