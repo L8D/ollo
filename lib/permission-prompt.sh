@@ -249,10 +249,18 @@ check_permission_array() {
     return $?
   fi
 
-  # Zip bash-split keys with raw sub-commands
+  # Zip bash-split keys with raw sub-commands (bash 3 compatible)
+  local idx=0
   local -a key_arr raw_arr
-  mapfile -t key_arr <<<"$sub_commands"
-  mapfile -t raw_arr <<<"$raw_subs"
+  while IFS= read -r _line; do
+    key_arr[idx]="$_line"
+    idx=$((idx + 1))
+  done <<<"$sub_commands"
+  idx=0
+  while IFS= read -r _line; do
+    raw_arr[idx]="$_line"
+    idx=$((idx + 1))
+  done <<<"$raw_subs"
 
   # Every sub-command must match (wildcard key OR exact key)
   for idx in "${!key_arr[@]}"; do
@@ -446,10 +454,10 @@ fi
 if [[ -n "$new_keys" ]]; then
   key_count=$(echo "$new_keys" | grep -c .)
   if [[ "$key_count" -eq 1 ]]; then
-    tool_description=$(printf '%s\n\nAlways allow will apply to: %s\nAlways allow exact will apply to: %s' "$tool_description" "$new_keys" "$exact_key")
+    tool_description=$(printf '%s\n\nAlways allow will apply to: %s' "$tool_description" "$new_keys")
   else
     formatted_keys=$(echo "$new_keys" | sed 's/^/• /')
-    tool_description=$(printf '%s\n\nAlways allow will apply to:\n%s\nAlways allow exact will apply to: %s' "$tool_description" "$formatted_keys" "$exact_key")
+    tool_description=$(printf '%s\n\nAlways allow will apply to:\n%s\n' "$tool_description" "$formatted_keys")
   fi
 fi
 
@@ -465,9 +473,17 @@ else
   dialog_title="Permission: $tool_name"
 fi
 
+CRIER_ENABLED=true crier
+
+# TODO: follow the steps from https://apple.stackexchange.com/a/261606 to make it possible to choose non-default choices with the keyboard (which makes it possible write a custom talon mode for interacting with the dialog too)
+
 response=$(
   osascript <<APPLESCRIPT 2>/dev/null
-choose from list $dialog_options with prompt "$escaped_description" with title "$dialog_title" default items {"Allow once"}
+set frontApp to name of (info for (path to frontmost application))
+tell application frontApp
+  activate
+  set theChoice to choose from list $dialog_options with prompt "$escaped_description" with title "$dialog_title" default items {"Allow once"}
+end tell
 APPLESCRIPT
 ) || {
   # Dialog was cancelled - deny by default
