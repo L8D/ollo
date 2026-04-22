@@ -492,28 +492,21 @@ CRIER_ENABLED=true crier
 # --- SNWLLY-282: enable Talon confirmation mode for the duration of the dialog ---
 prior_talon_mode=""
 if [[ "$OLLO_TALON_ENABLED" == "true" ]]; then
-  TALON_PYTHON="${TALON_PYTHON:-$HOME/.talon/bin/python}"
-  if [[ -x "$TALON_PYTHON" ]]; then
-    prior_talon_mode=$("$TALON_PYTHON" -c '
-from talon import actions, scope
-modes = scope.get("mode") or []
-if "sleep" in modes:
-    print("SKIP")
-else:
-    prior = next((m for m in modes if m in ("command", "dictation")), "command")
-    actions.mode.disable(prior)
-    actions.mode.enable("user.confirmation")
-    print(prior)
-' 2>/dev/null) || prior_talon_mode=""
+  TALON_REPL="${TALON_REPL:-$HOME/.talon/bin/repl}"
+  if [[ -x "$TALON_REPL" ]]; then
+    # NOTE: talon's repl evaluates one line at a time, so the whole
+    # program must be a single expression. We use exec() on a ";"-joined
+    # source string to keep control flow intact.
+    talon_enter_src='from talon import actions, scope; _m = scope.get("mode") or []; print("SKIP") if "sleep" in _m else (lambda p: (actions.mode.disable(p), actions.mode.enable("user.confirmation"), print(p)))(next((x for x in _m if x in ("command", "dictation")), "command"))'
+    prior_talon_mode=$(printf '%s\n' "$talon_enter_src" | "$TALON_REPL" 2>/dev/null) || prior_talon_mode=""
+    # repl echoes prompts and source lines; keep only the first plain token.
+    prior_talon_mode=$(printf '%s\n' "$prior_talon_mode" | grep -Eo '^(command|dictation|SKIP)$' | head -n1)
   fi
 
   restore_talon_mode() {
-    if [[ -n "$prior_talon_mode" && "$prior_talon_mode" != "SKIP" && -x "$TALON_PYTHON" ]]; then
-      "$TALON_PYTHON" -c "
-from talon import actions
-actions.mode.disable('user.confirmation')
-actions.mode.enable('$prior_talon_mode')
-" 2>/dev/null || true
+    if [[ -n "$prior_talon_mode" && "$prior_talon_mode" != "SKIP" && -x "$TALON_REPL" ]]; then
+      local restore_src="from talon import actions; actions.mode.disable('user.confirmation'); actions.mode.enable('$prior_talon_mode')"
+      printf '%s\n' "$restore_src" | "$TALON_REPL" >/dev/null 2>&1 || true
     fi
   }
   trap restore_talon_mode EXIT
