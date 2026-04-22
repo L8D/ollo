@@ -465,24 +465,67 @@ fi
 escaped_description=$(printf '%s' "$tool_description" | sed 's/\\/\\\\/g; s/"/\\"/g')
 
 # Build dialog options based on mode
-if [[ "$OLLO_MODE" == "ralph" ]]; then
-  dialog_options='{"Allow once", "Always allow", "Always allow exact", "Deny once", "Always deny", "Provide correction"}'
-  dialog_title="Ralph Permission: $tool_name"
+if [[ "$OLLO_TALON_ENABLED" == "true" ]]; then
+  if [[ "$OLLO_MODE" == "ralph" ]]; then
+    dialog_options='{"1. Allow once", "2. Always allow", "3. Always allow exact", "4. Deny once", "5. Always deny", "6. Provide correction"}'
+    dialog_title="Ralph Permission: $tool_name"
+    default_item='"1. Allow once"'
+  else
+    dialog_options='{"1. Allow once", "2. Always allow", "3. Always allow exact", "4. Deny once", "5. Always deny", "6. Fallback to built-in"}'
+    dialog_title="Permission: $tool_name"
+    default_item='"1. Allow once"'
+  fi
 else
-  dialog_options='{"Allow once", "Always allow", "Always allow exact", "Deny once", "Always deny", "Fallback to built-in"}'
-  dialog_title="Permission: $tool_name"
+  if [[ "$OLLO_MODE" == "ralph" ]]; then
+    dialog_options='{"Allow once", "Always allow", "Always allow exact", "Deny once", "Always deny", "Provide correction"}'
+    dialog_title="Ralph Permission: $tool_name"
+    default_item='"Allow once"'
+  else
+    dialog_options='{"Allow once", "Always allow", "Always allow exact", "Deny once", "Always deny", "Fallback to built-in"}'
+    dialog_title="Permission: $tool_name"
+    default_item='"Allow once"'
+  fi
 fi
 
 CRIER_ENABLED=true crier
 
-# TODO: follow the steps from https://apple.stackexchange.com/a/261606 to make it possible to choose non-default choices with the keyboard (which makes it possible write a custom talon mode for interacting with the dialog too)
+# --- SNWLLY-282: enable Talon confirmation mode for the duration of the dialog ---
+prior_talon_mode=""
+if [[ "$OLLO_TALON_ENABLED" == "true" ]]; then
+  TALON_PYTHON="${TALON_PYTHON:-$HOME/.talon/bin/python}"
+  if [[ -x "$TALON_PYTHON" ]]; then
+    prior_talon_mode=$("$TALON_PYTHON" -c '
+from talon import actions, scope
+modes = scope.get("mode") or []
+if "sleep" in modes:
+    print("SKIP")
+else:
+    prior = next((m for m in modes if m in ("command", "dictation")), "command")
+    actions.mode.disable(prior)
+    actions.mode.enable("user.confirmation")
+    print(prior)
+' 2>/dev/null) || prior_talon_mode=""
+  fi
+
+  restore_talon_mode() {
+    if [[ -n "$prior_talon_mode" && "$prior_talon_mode" != "SKIP" && -x "$TALON_PYTHON" ]]; then
+      "$TALON_PYTHON" -c "
+from talon import actions
+actions.mode.disable('user.confirmation')
+actions.mode.enable('$prior_talon_mode')
+" 2>/dev/null || true
+    fi
+  }
+  trap restore_talon_mode EXIT
+fi
+# --- /SNWLLY-282 ---
 
 response=$(
   osascript <<APPLESCRIPT 2>/dev/null
 set frontApp to name of (info for (path to frontmost application))
 tell application frontApp
   activate
-  set theChoice to choose from list $dialog_options with prompt "$escaped_description" with title "$dialog_title" default items {"Allow once"}
+  set theChoice to choose from list $dialog_options with prompt "$escaped_description" with title "$dialog_title" default items {$default_item}
 end tell
 APPLESCRIPT
 ) || {
@@ -490,6 +533,11 @@ APPLESCRIPT
   hook_log_stdout '{"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"deny","permissionDecisionReason":"Permission dialog cancelled"}}'
   exit 0
 }
+
+# Strip the "N. " numeric prefix added for keyboard navigation (SNWLLY-282)
+if [[ "$OLLO_TALON_ENABLED" == "true" ]]; then
+  response="${response#[0-9]. }"
+fi
 
 # Parse response ("false" means user clicked Cancel)
 case "$response" in
