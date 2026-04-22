@@ -497,11 +497,55 @@ ${doc_content}
 
     local post_subtask_id=$(echo "$post_task_json" | jq -r '.subtask_id')
 
-    # If still on same task, Claude failed to complete it
+    # If still on same task, Claude failed to complete it — pause and prompt
+    # for a nudge message instead of exiting outright.
     if [[ "$post_subtask_id" == "$subtask_id" ]]; then
-      log "$RED" "Still on $subtask_id - Claude failed to complete task, exiting"
+      log "$RED" "Still on $subtask_id - Claude failed to complete task"
       EXIT_MESSAGE="Claude failed to complete task $subtask_id"
-      exit 1
+
+      # Fire stall Slack notification immediately (independent of final teardown).
+      # Run in a subshell with overridden vars so the real EXIT_STATUS/EXIT_MESSAGE
+      # — used by the EXIT-trap teardown — stay untouched.
+      (EXIT_STATUS="stalled" EXIT_MESSAGE="Stalled on $subtask_id — awaiting nudge" \
+        send_slack_notification) || true
+
+      # Prompt for nudge; empty line or Ctrl+C aborts.
+      log "$YELLOW" "Enter nudge message to resume (empty line to abort):"
+      local nudge_message=""
+      read -r nudge_message </dev/tty || true
+      if [[ -z "$nudge_message" ]]; then
+        log "$RED" "No nudge provided, exiting"
+        exit 1
+      fi
+
+      # Resume the stalled session.
+      local stall_session_id
+      stall_session_id=$(<"$SESSION_ID_FILE")
+      if [[ -z "$stall_session_id" ]]; then
+        log "$RED" "No session ID available for resume"
+        EXIT_MESSAGE="Stall-resume failed: no session ID"
+        exit 1
+      fi
+
+      log "$CYAN" "Resuming stalled session with: $nudge_message"
+      set +e
+      (claude \
+        --permission-mode acceptEdits \
+        --output-format stream-json \
+        --verbose \
+        --name "$session_name" \
+        --resume "$stall_session_id" \
+        -p "$nudge_message" 2>&1 | parse_streaming_json) &
+      PIPELINE_PID=$!
+      wait $PIPELINE_PID 2>/dev/null
+      PIPELINE_PID=""
+      set -e
+
+      # Reset EXIT_MESSAGE so a successful continuation doesn't carry stale
+      # failure text into a later teardown notification.
+      EXIT_MESSAGE=""
+
+      continue
     fi
 
     log "$GREEN" "Task $subtask_id completed, moving to next..."
