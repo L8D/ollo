@@ -464,6 +464,12 @@ fi
 # Escape special characters for osascript (double quotes and backslashes)
 escaped_description=$(printf '%s' "$tool_description" | sed 's/\\/\\\\/g; s/"/\\"/g')
 
+if [[ -f "$HOME/.talon/user/speak_phrase.py" ]]; then
+  export OLLO_TALON_ENABLED=true
+else
+  export OLLO_TALON_ENABLED=false
+fi
+
 # Build dialog options based on mode
 if [[ "$OLLO_TALON_ENABLED" == "true" ]]; then
   if [[ "$OLLO_MODE" == "ralph" ]]; then
@@ -487,7 +493,12 @@ else
   fi
 fi
 
-CRIER_ENABLED=true crier
+if [[ "$OLLO_TALON_ENABLED" == "true" ]]; then
+  say_keys="${new_keys:-$permission_key}"
+  say "Permission request. $(printf '%s' "$say_keys" | tr '\n' ',' | sed 's/,$//; s/,/, /g')" &
+else
+  CRIER_ENABLED=true crier
+fi
 
 # --- SNWLLY-282: enable Talon confirmation mode for the duration of the dialog ---
 prior_talon_mode=""
